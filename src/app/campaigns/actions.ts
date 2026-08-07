@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
+import { getCurrentMembership } from "@/lib/organizations";
 
 export async function createCampaign(name: string, contactListId: string) {
   const supabase = createClient();
@@ -11,12 +12,15 @@ export async function createCampaign(name: string, contactListId: string) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const membership = await getCurrentMembership(supabase);
+
   const { data: campaign, error } = await supabase
     .from("campaigns")
     .insert({
       user_id: user.id,
       name,
       contact_list_id: contactListId,
+      organization_id: membership?.organization_id ?? null,
     })
     .select("id")
     .single();

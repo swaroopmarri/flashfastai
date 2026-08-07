@@ -1,4 +1,4 @@
-This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase email/password authentication, contact list management with ZeroBounce email verification, and a minimal campaign builder.
+This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase email/password authentication, multi-tenant organizations with per-member quotas, contact list management with ZeroBounce email verification, and a minimal campaign builder.
 
 ## Getting Started
 
@@ -21,12 +21,19 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    | `NEXT_PUBLIC_SUPABASE_URL` | Supabase dashboard → Project Settings → Data API (or "API") → **Project URL** |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Same page → API Keys → **anon / public** key |
    | `ZEROBOUNCE_API_KEY` | [ZeroBounce dashboard → API Settings](https://www.zerobounce.net/members/apikeys/) |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Same Supabase API page → **service_role** secret key |
+   | `CRON_SECRET` | Any long random string you generate (e.g. `openssl rand -hex 32`) |
 
-   The two `NEXT_PUBLIC_` values are safe to expose in the browser — they're scoped by Supabase Row Level Security, not secrets. `ZEROBOUNCE_API_KEY` is different: it must **never** be prefixed with `NEXT_PUBLIC_` and is only read server-side (Server Actions / Route Handlers), never bundled to the client.
+   The two `NEXT_PUBLIC_` values are safe to expose in the browser — they're scoped by Supabase Row Level Security, not secrets. The rest are server-only and must never be prefixed with `NEXT_PUBLIC_`:
+   - `ZEROBOUNCE_API_KEY` is only read in Server Actions / Route Handlers.
+   - `SUPABASE_SERVICE_ROLE_KEY` is **extremely sensitive** — it bypasses every RLS policy in the database. It's used in exactly one place (`src/utils/supabase/admin.ts`), imported only by the cron quota-reset route. Do not reuse it anywhere else.
+   - `CRON_SECRET` protects `/api/cron/reset-quotas` from being invoked by anyone else. Vercel automatically sends it as a Bearer token when it triggers the cron job, once the same value is set in your Vercel project.
 
-   In **Vercel**, add all three under Project → Settings → Environment Variables (check Production, Preview, and Development), then redeploy — env var changes don't apply to already-running deployments.
+   In **Vercel**, add all five under Project → Settings → Environment Variables (check Production, Preview, and Development), then redeploy — env var changes don't apply to already-running deployments.
 
-4. Run the database migration. Open the Supabase dashboard → **SQL Editor → New query**, paste the contents of `supabase/migrations/0001_contacts_and_campaigns.sql`, and run it. This creates the `contact_lists`, `contacts`, `verification_jobs`, and `campaigns` tables with Row Level Security so each user only sees their own data.
+4. Run the database migrations, in order. Open the Supabase dashboard → **SQL Editor → New query**:
+   - Paste and run `supabase/migrations/0001_contacts_and_campaigns.sql` first — creates `contact_lists`, `contacts`, `verification_jobs`, `campaigns`.
+   - Then paste and run `supabase/migrations/0002_organizations.sql` — creates `organizations`, `memberships`, `invites`, quota-enforcement functions, and backfills a personal organization for any user who already had contact lists before this migration.
 
 5. By default, Supabase requires users to confirm their email before they can log in. For local testing you can either:
    - Disable it: **Authentication → Sign In / Providers → Email → turn off "Confirm email"**, or
@@ -47,13 +54,27 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
 - `src/app/auth/callback` — exchanges Supabase's email-confirmation `code` for a session
 - `src/app/contacts` — contact list overview, CSV/Excel upload & merge (`UploadForm.tsx`), per-list detail page with a "Verify Contacts" button (`[listId]/VerifyPanel.tsx`)
 - `src/app/campaigns` — minimal campaign builder; `new` creates a draft campaign against a contact list, `[id]/audience` is the Audience step (filter to deliverable-only or include risky)
+- `src/app/team` — admin-only Team page: invite members, view/edit their quotas, see org-wide usage totals
+- `src/app/invite/[token]` — public invite-acceptance page; sets a password and joins the inviting org
 - `src/app/api/verification-jobs/[jobId]` — polling endpoint the browser calls while a bulk ZeroBounce verification job runs in the background
+- `src/app/api/cron/reset-quotas` — called by Vercel Cron (see `vercel.json`) to reset monthly usage; protected by `CRON_SECRET`
 - `src/lib/zerobounce.ts` — ZeroBounce API client (single-email `validate` and the bulk `sendfile` / `filestatus` / `getfile` flow) and status mapping
-- `src/lib/verification.ts` — verification business logic shared by the "start verification" action and the poll route
+- `src/lib/verification.ts` — verification business logic shared by the "start verification" action and the poll route; checks/consumes quota before calling ZeroBounce
 - `src/lib/parseContactsFile.ts` — client-side CSV/Excel parsing (Papa Parse / SheetJS), detects email/name/company columns by header name
-- `src/utils/supabase` — Supabase client helpers for the browser, Server Components/Actions, and middleware
+- `src/lib/organizations.ts` — membership lookups and the post-signup "create org or accept invite" logic
+- `src/utils/supabase` — Supabase client helpers: browser, Server Components/Actions (RLS-respecting), middleware, and `admin.ts` (service-role, cron-only)
 - `src/middleware.ts` — refreshes the auth session on every request and guards `/dashboard`
 - `supabase/migrations/0001_contacts_and_campaigns.sql` — schema + RLS policies for contacts, contact lists, verification jobs, and campaigns
+- `supabase/migrations/0002_organizations.sql` — organizations, memberships, invites, and the quota-enforcement/reset functions
+
+## Organizations, invites, and quotas
+
+- Signing up always creates a **new organization** with you as its admin (enter an organization name on the signup form). There's no self-serve "join with a code" option — joining only happens via an admin-sent invite link.
+- On the **Team** page (admin-only, linked from the dashboard), an admin can invite members (generates a shareable `/invite/[token]` link — no email is sent automatically), edit each member's `validation_quota`/`send_quota` (capped by the organization's total plan quota), and see org-wide usage.
+- Every user belongs to **exactly one organization**.
+- Before running verification, `try_consume_quota()` (a Postgres function) atomically checks both the member's own remaining quota and the organization's aggregate quota, and blocks with "You've used your monthly validation limit. Contact your admin to increase it." if either is exceeded. The same function supports a `'send'` kind for when campaign sending is built.
+- Contact lists and campaigns are still private per-user even within an organization — an admin sees teammates' usage numbers, not their contact data.
+- Monthly usage resets via `/api/cron/reset-quotas`, scheduled daily in `vercel.json` (only memberships whose `quota_reset_at` has actually passed get reset, so daily granularity is fine for a monthly cycle).
 
 ## How contact verification works
 

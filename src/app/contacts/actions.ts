@@ -7,6 +7,7 @@ import {
   startVerification as startVerificationLib,
   type StartVerificationResult,
 } from "@/lib/verification";
+import { getCurrentMembership } from "@/lib/organizations";
 
 export interface ParsedContactRow {
   email: string;
@@ -33,9 +34,15 @@ export async function createContactList(name: string, rows: ParsedContactRow[]) 
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const membership = await getCurrentMembership(supabase);
+
   const { data: list, error: listError } = await supabase
     .from("contact_lists")
-    .insert({ user_id: user.id, name })
+    .insert({
+      user_id: user.id,
+      name,
+      organization_id: membership?.organization_id ?? null,
+    })
     .select("id")
     .single();
 

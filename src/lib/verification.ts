@@ -17,8 +17,12 @@ export interface VerificationSummary {
 
 export type StartVerificationResult =
   | { mode: "none" }
+  | { mode: "quota_exceeded"; message: string }
   | { mode: "single"; summary: VerificationSummary }
   | { mode: "bulk"; jobId: string };
+
+const QUOTA_EXCEEDED_MESSAGE =
+  "You've used your monthly validation limit. Contact your admin to increase it.";
 
 async function applyResults(
   supabase: SupabaseClient,
@@ -59,6 +63,15 @@ export async function startVerification(
   }
 
   const emails = pending.map((c) => c.email as string);
+
+  const { data: quotaOk, error: quotaError } = await supabase.rpc("try_consume_quota", {
+    p_kind: "validation",
+    p_amount: emails.length,
+  });
+  if (quotaError) throw quotaError;
+  if (!quotaOk) {
+    return { mode: "quota_exceeded", message: QUOTA_EXCEEDED_MESSAGE };
+  }
 
   if (emails.length <= BULK_THRESHOLD) {
     const results = await validateBatch(emails);

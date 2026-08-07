@@ -72,6 +72,8 @@ export function VerifyPanel({
       const result = await startVerificationAction(listId);
       if (result.mode === "none") {
         setState({ phase: "error", message: "No contacts are pending verification." });
+      } else if (result.mode === "quota_exceeded") {
+        setState({ phase: "error", message: result.message });
       } else if (result.mode === "single") {
         setState({ phase: "done", summary: result.summary });
         router.refresh();
