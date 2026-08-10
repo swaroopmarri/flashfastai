@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
@@ -10,6 +11,48 @@ const STATUS_STYLES: Record<string, string> = {
   risky: "bg-yellow-100 text-yellow-700",
   undeliverable: "bg-red-100 text-red-700",
 };
+
+interface ContactRow {
+  id: string;
+  email: string;
+  name: string | null;
+  company: string | null;
+  status: string;
+}
+
+function emailDomain(email: string): string {
+  return email.split("@")[1]?.toLowerCase() ?? "";
+}
+
+/** Groups by company when known, otherwise by email domain, so contacts
+ * from the same company or the same mail domain cluster together. */
+function groupKey(c: ContactRow): string {
+  const company = c.company?.trim().toLowerCase();
+  return company ? `company:${company}` : `domain:${emailDomain(c.email)}`;
+}
+
+function groupLabel(c: ContactRow): string {
+  const company = c.company?.trim();
+  return company ? `Company: ${company}` : `Domain: ${emailDomain(c.email)}`;
+}
+
+function sortAndGroupContacts(contacts: ContactRow[]): {
+  sorted: ContactRow[];
+  counts: Map<string, number>;
+} {
+  const sorted = [...contacts].sort((a, b) => {
+    const keyDiff = groupKey(a).localeCompare(groupKey(b));
+    return keyDiff !== 0 ? keyDiff : a.email.localeCompare(b.email);
+  });
+
+  const counts = new Map<string, number>();
+  for (const c of sorted) {
+    const key = groupKey(c);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return { sorted, counts };
+}
 
 export default async function ContactListPage({
   params,
@@ -49,6 +92,10 @@ export default async function ContactListPage({
   const pendingCount =
     contacts?.filter((c) => c.status === "pending_verification").length ?? 0;
 
+  const { sorted: sortedContacts, counts: groupCounts } = sortAndGroupContacts(
+    contacts ?? [],
+  );
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <div className="mb-8 flex items-center justify-between">
@@ -85,20 +132,40 @@ export default async function ContactListPage({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {contacts?.map((c) => (
-              <tr key={c.id}>
-                <td className="px-4 py-2 text-gray-900">{c.email}</td>
-                <td className="px-4 py-2 text-gray-600">{c.name || "—"}</td>
-                <td className="px-4 py-2 text-gray-600">{c.company || "—"}</td>
-                <td className="px-4 py-2">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[c.status] ?? "bg-gray-100 text-gray-700"}`}
-                  >
-                    {c.status.replace("_", " ")}
-                  </span>
-                </td>
-              </tr>
-            ))}
+            {(() => {
+              let lastKey: string | null = null;
+              return sortedContacts.map((c) => {
+                const key = groupKey(c);
+                const isNewGroup = key !== lastKey;
+                lastKey = key;
+                return (
+                  <Fragment key={c.id}>
+                    {isNewGroup && (
+                      <tr className="bg-gray-50">
+                        <td
+                          colSpan={4}
+                          className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500"
+                        >
+                          {groupLabel(c)} ({groupCounts.get(key)})
+                        </td>
+                      </tr>
+                    )}
+                    <tr>
+                      <td className="px-4 py-2 text-gray-900">{c.email}</td>
+                      <td className="px-4 py-2 text-gray-600">{c.name || "—"}</td>
+                      <td className="px-4 py-2 text-gray-600">{c.company || "—"}</td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[c.status] ?? "bg-gray-100 text-gray-700"}`}
+                        >
+                          {c.status.replace("_", " ")}
+                        </span>
+                      </td>
+                    </tr>
+                  </Fragment>
+                );
+              });
+            })()}
           </tbody>
         </table>
       </div>
