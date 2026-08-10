@@ -3,20 +3,24 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
+  --background: #f9fafb;
   --foreground: #171717;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* This app's text colors (text-gray-900, text-gray-700, ...) are chosen
+ * for a light background and were never paired with a dark theme, so we
+ * intentionally do NOT flip to a dark background on prefers-color-scheme:
+ * dark -- doing so left several pages rendering dark-gray text directly on
+ * a near-black page with unreadable contrast. Keep it light always. */
 
 body {
   color: var(--foreground);
-  background: var(--background);
+  background-color: var(--background);
+  background-image:
+    radial-gradient(circle at 15% 10%, rgba(99, 102, 241, 0.10), transparent 40%),
+    radial-gradient(circle at 85% 0%, rgba(56, 189, 248, 0.10), transparent 40%),
+    radial-gradient(circle at 50% 100%, rgba(129, 140, 248, 0.08), transparent 45%);
+  background-attachment: fixed;
   font-family: Arial, Helvetica, sans-serif;
 }
 
