@@ -4,13 +4,54 @@ import type { ParsedContactRow } from "@/app/contacts/actions";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function findColumn(headers: string[], candidates: string[]): string | null {
-  const lowered = headers.map((h) => h.toLowerCase());
-  for (const candidate of candidates) {
+const EMAIL_HEADER_EXACT = ["email", "e-mail", "email address", "mail", "mail id", "mailid"];
+const EMAIL_HEADER_SUBSTRINGS = ["email", "e-mail", "mail"];
+
+function findColumn(
+  headers: string[],
+  exactCandidates: string[],
+  substringCandidates: string[],
+): string | null {
+  const lowered = headers.map((h) => h.trim().toLowerCase());
+
+  for (const candidate of exactCandidates) {
+    const idx = lowered.findIndex((h) => h === candidate);
+    if (idx !== -1) return headers[idx];
+  }
+  for (const candidate of substringCandidates) {
     const idx = lowered.findIndex((h) => h.includes(candidate));
     if (idx !== -1) return headers[idx];
   }
   return null;
+}
+
+/** Falls back to scanning cell values when no header looks like an email column. */
+function findEmailColumnByContent(
+  headers: string[],
+  records: Record<string, unknown>[],
+): string | null {
+  let bestHeader: string | null = null;
+  let bestScore = 0;
+
+  for (const header of headers) {
+    let matches = 0;
+    let nonEmpty = 0;
+    for (const record of records) {
+      const value = String(record[header] ?? "").trim();
+      if (!value) continue;
+      nonEmpty++;
+      if (EMAIL_REGEX.test(value)) matches++;
+    }
+    // Require most non-empty values in the column to look like emails, not
+    // just one coincidental match, so we don't misidentify an unrelated
+    // free-text column.
+    if (matches > 0 && nonEmpty > 0 && matches / nonEmpty >= 0.5 && matches > bestScore) {
+      bestScore = matches;
+      bestHeader = header;
+    }
+  }
+
+  return bestHeader;
 }
 
 function rowsFromRecords(records: Record<string, unknown>[]): {
@@ -20,12 +61,20 @@ function rowsFromRecords(records: Record<string, unknown>[]): {
   if (records.length === 0) return { rows: [], skipped: 0 };
 
   const headers = Object.keys(records[0]);
-  const emailCol = findColumn(headers, ["email"]);
+  const emailCol =
+    findColumn(headers, EMAIL_HEADER_EXACT, EMAIL_HEADER_SUBSTRINGS) ||
+    findEmailColumnByContent(headers, records);
   if (!emailCol) {
-    throw new Error("No column containing \"email\" was found in the file.");
+    throw new Error(
+      "Couldn't find a column with email addresses in it — check the file has a column labeled \"email\" (or similar) or containing actual email addresses.",
+    );
   }
-  const nameCol = findColumn(headers, ["name"]);
-  const companyCol = findColumn(headers, ["company", "organization", "organisation"]);
+  const nameCol = findColumn(headers, ["name"], ["name"]);
+  const companyCol = findColumn(
+    headers,
+    ["company", "organization", "organisation"],
+    ["company", "organization", "organisation"],
+  );
 
   const rows: ParsedContactRow[] = [];
   let skipped = 0;
