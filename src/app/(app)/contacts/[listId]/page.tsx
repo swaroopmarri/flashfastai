@@ -1,5 +1,4 @@
 import { Fragment } from "react";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { UploadForm } from "../UploadForm";
@@ -98,12 +97,7 @@ export default async function ContactListPage({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">{list.name}</h1>
-        <Link href="/contacts" className="text-sm text-indigo-600 hover:underline">
-          Back to lists
-        </Link>
-      </div>
+      <h1 className="mb-8 text-2xl font-semibold text-gray-900">{list.name}</h1>
 
       <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <VerifyPanel

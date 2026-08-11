@@ -1,6 +1,6 @@
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import type { ParsedContactRow } from "@/app/contacts/actions";
+import type { ParsedContactRow } from "@/app/(app)/contacts/actions";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

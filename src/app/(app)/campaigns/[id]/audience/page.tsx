@@ -38,12 +38,7 @@ export default async function AudiencePage({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">{campaign.name}</h1>
-        <Link href="/campaigns" className="text-sm text-indigo-600 hover:underline">
-          Back to campaigns
-        </Link>
-      </div>
+      <h1 className="mb-8 text-2xl font-semibold text-gray-900">{campaign.name}</h1>
 
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="mb-1 text-lg font-medium text-gray-900">Audience</h2>

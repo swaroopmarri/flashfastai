@@ -18,12 +18,7 @@ export default async function CampaignsPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Campaigns</h1>
-        <Link href="/dashboard" className="text-sm text-indigo-600 hover:underline">
-          Back to dashboard
-        </Link>
-      </div>
+      <h1 className="mb-8 text-2xl font-semibold text-gray-900">Campaigns</h1>
 
       <Link
         href="/campaigns/new"

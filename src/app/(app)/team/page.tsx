@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { getCurrentMembership } from "@/lib/organizations";
@@ -41,12 +40,7 @@ export default async function TeamPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">{org.name} — Team</h1>
-        <Link href="/dashboard" className="text-sm text-indigo-600 hover:underline">
-          Back to dashboard
-        </Link>
-      </div>
+      <h1 className="mb-8 text-2xl font-semibold text-gray-900">{org.name} — Team</h1>
 
       <div className="mb-8 grid grid-cols-2 gap-4">
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
