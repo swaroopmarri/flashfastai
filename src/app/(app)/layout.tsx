@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import { getCurrentMembership } from "@/lib/organizations";
+import { getCurrentMembership, finalizeSignup } from "@/lib/organizations";
 import { logout } from "./dashboard/actions";
 import { NavLink } from "./NavLink";
 
@@ -16,7 +16,17 @@ export default async function AppLayout({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const membership = await getCurrentMembership(supabase);
+  let membership = await getCurrentMembership(supabase);
+
+  // Safety net: every authenticated user should have a membership by the
+  // time they reach any app page, but if signup-time provisioning was ever
+  // skipped or failed silently (e.g. an account that predates this
+  // feature), create one on the fly instead of leaving every quota-gated
+  // action to fail with a confusing "not part of an organization" error.
+  if (!membership) {
+    await finalizeSignup(supabase, user);
+    membership = await getCurrentMembership(supabase);
+  }
 
   return (
     <div className="min-h-screen">

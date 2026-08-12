@@ -20,11 +20,21 @@ export interface Membership {
 export async function getCurrentMembership(
   supabase: SupabaseClient,
 ): Promise<Membership | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  // Explicitly scoped to the calling user: the memberships RLS SELECT
+  // policy also lets an admin read every membership in their org, so an
+  // unfiltered query here would return multiple rows for any admin whose
+  // org has more than one member and crash .maybeSingle().
   const { data, error } = await supabase
     .from("memberships")
     .select(
       "id, organization_id, role, status, validation_quota, send_quota, validation_used, send_used",
     )
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (error) throw error;
