@@ -40,6 +40,7 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    - `supabase/migrations/0002_organizations.sql` — creates `organizations`, `memberships`, `invites`, quota-enforcement functions, and backfills a personal organization for any user who already had contact lists before this migration.
    - `supabase/migrations/0003_fix_membership_backfill.sql` — a corrected re-run of that backfill (0002's version missed accounts that didn't have a contact list yet at the time it ran); safe to run even if you already ran 0002 successfully.
    - `supabase/migrations/0004_campaign_sending.sql` — adds campaign content fields, `send_jobs`, `campaign_recipients`, `unsubscribes`, and the public unsubscribe function.
+   - `supabase/migrations/0005_contact_list_summaries.sql` — adds `get_contact_list_status_counts()`, a grouped-aggregate function backing the Contacts overview cards.
 
 ## Setting up Amazon SES
 
@@ -93,6 +94,8 @@ Sends to unverified addresses while still in sandbox mode fail per-recipient wit
 - `supabase/migrations/0002_organizations.sql` — organizations, memberships, invites, and the quota-enforcement/reset functions
 - `supabase/migrations/0003_fix_membership_backfill.sql` — corrected backfill for accounts 0002 missed
 - `supabase/migrations/0004_campaign_sending.sql` — campaign content fields, send jobs, per-recipient tracking, unsubscribe suppression
+- `supabase/migrations/0005_contact_list_summaries.sql` — `get_contact_list_status_counts()`, a single grouped-aggregate query backing the Contacts overview cards
+- `src/app/api/contacts/[listId]/export` — downloads all contacts in a list as CSV (email, name, company, status, zerobounce_sub_status, verified_at)
 
 ## Organizations, invites, and quotas
 
@@ -105,7 +108,9 @@ Sends to unverified addresses while still in sandbox mode fail per-recipient wit
 
 ## How contact verification works
 
-1. On the contact list page, contacts start out `pending_verification` after upload.
+`/contacts` shows one card per list (name, created date, total count, a status-count badge row, and a headline "X% deliverable") rather than every contact — status counts come from a single grouped-aggregate query (`get_contact_list_status_counts()`), not by pulling every row to the client, so it stays fast for large lists. Each card has **Open list** (the detail page below, with the full per-contact table, grouping, and Verify Contacts) and **Download CSV** (exports every contact in that list with full detail: email, name, company, status, zerobounce_sub_status, verified_at).
+
+1. On the contact list detail page, contacts start out `pending_verification` after upload.
 2. Clicking **Verify Contacts** calls ZeroBounce:
    - **≤ 50 pending contacts**: calls ZeroBounce's single-email `validate` endpoint concurrently (bounded concurrency) and updates statuses immediately.
    - **> 50 pending contacts**: submits the list to ZeroBounce's bulk endpoint, which processes asynchronously. A `verification_jobs` row tracks progress; the browser polls `/api/verification-jobs/[jobId]` every few seconds until ZeroBounce reports the file complete, then downloads and applies the results. You can navigate away and come back — the job keeps running server-side and the page resumes polling on reload.
