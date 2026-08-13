@@ -37,29 +37,47 @@ export default async function TeamPage() {
   );
   const totalSendQuota = (members as OrgMember[]).reduce((sum, m) => sum + m.send_quota, 0);
   const totalSendUsed = (members as OrgMember[]).reduce((sum, m) => sum + m.send_used, 0);
+  const isSolo = (members as OrgMember[]).length === 1;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="mb-8 text-2xl font-semibold text-gray-900">{org.name} — Team</h1>
 
+      {isSolo && (
+        <p className="mb-8 rounded-md bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+          You&apos;re currently the only member, so your quota is your
+          organization&apos;s full quota below. Invite teammates to split it
+          with them — each new member starts at 0 until you allocate some of
+          this quota to them.
+        </p>
+      )}
+
       <div className="mb-8 grid grid-cols-2 gap-4">
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">Validations (org-wide)</p>
+          <p className="text-sm text-gray-500">
+            {isSolo ? "Validations (your quota)" : "Validations (org-wide)"}
+          </p>
           <p className="text-lg font-semibold text-gray-900">
             {totalValidationUsed} / {org.plan_validation_quota}
           </p>
-          <p className="text-xs text-gray-400">
-            {totalValidationQuota} allocated to members, {org.plan_validation_quota - totalValidationQuota} unallocated
-          </p>
+          {!isSolo && (
+            <p className="text-xs text-gray-400">
+              {totalValidationQuota} allocated to members, {org.plan_validation_quota - totalValidationQuota} unallocated
+            </p>
+          )}
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <p className="text-sm text-gray-500">Sends (org-wide)</p>
+          <p className="text-sm text-gray-500">
+            {isSolo ? "Sends (your quota)" : "Sends (org-wide)"}
+          </p>
           <p className="text-lg font-semibold text-gray-900">
             {totalSendUsed} / {org.plan_send_quota}
           </p>
-          <p className="text-xs text-gray-400">
-            {totalSendQuota} allocated to members, {org.plan_send_quota - totalSendQuota} unallocated
-          </p>
+          {!isSolo && (
+            <p className="text-xs text-gray-400">
+              {totalSendQuota} allocated to members, {org.plan_send_quota - totalSendQuota} unallocated
+            </p>
+          )}
         </div>
       </div>
 
