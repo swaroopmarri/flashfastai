@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { getCurrentMembership } from "@/lib/organizations";
+import { startCampaignSend, type StartSendResult } from "@/lib/campaignSend";
 
 export async function createCampaign(name: string, contactListId: string) {
   const supabase = createClient();
@@ -40,4 +41,31 @@ export async function updateAudience(campaignId: string, includeRisky: boolean) 
 
   if (error) throw error;
   revalidatePath(`/campaigns/${campaignId}/audience`);
+}
+
+export async function updateCampaignContent(
+  campaignId: string,
+  subject: string,
+  body: string,
+  replyTo: string,
+) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("campaigns")
+    .update({
+      subject: subject.trim(),
+      body: body.trim(),
+      reply_to: replyTo.trim() || null,
+    })
+    .eq("id", campaignId);
+
+  if (error) throw error;
+  revalidatePath(`/campaigns/${campaignId}/compose`);
+}
+
+export async function startCampaignSendAction(campaignId: string): Promise<StartSendResult> {
+  const supabase = createClient();
+  const result = await startCampaignSend(supabase, campaignId);
+  revalidatePath(`/campaigns/${campaignId}/compose`);
+  return result;
 }

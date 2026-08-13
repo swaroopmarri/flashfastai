@@ -87,10 +87,12 @@ export default async function AudiencePage({
           riskyCount={counts.risky}
         />
 
-        <p className="mt-6 text-sm text-gray-400">
-          Campaign content and sending aren&apos;t built yet — this step only
-          defines the audience for now.
-        </p>
+        <Link
+          href={`/campaigns/${campaign.id}/compose`}
+          className="mt-6 inline-block rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+        >
+          Continue to Compose
+        </Link>
       </div>
     </div>
   );

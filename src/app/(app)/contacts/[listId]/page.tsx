@@ -9,6 +9,7 @@ const STATUS_STYLES: Record<string, string> = {
   deliverable: "bg-green-100 text-green-700",
   risky: "bg-yellow-100 text-yellow-700",
   undeliverable: "bg-red-100 text-red-700",
+  unsubscribed: "bg-gray-200 text-gray-500",
 };
 
 interface ContactRow {

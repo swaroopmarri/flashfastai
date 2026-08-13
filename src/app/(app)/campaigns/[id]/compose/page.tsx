@@ -1,0 +1,138 @@
+import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+import { createClient } from "@/utils/supabase/server";
+import { ComposeForm } from "./ComposeForm";
+import { SendPanel } from "./SendPanel";
+
+export default async function ComposePage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: campaign } = await supabase
+    .from("campaigns")
+    .select(
+      "id, name, subject, body, reply_to, status, contact_list_id, include_risky, user_id",
+    )
+    .eq("id", params.id)
+    .maybeSingle();
+
+  if (!campaign || !campaign.contact_list_id) notFound();
+
+  const statuses = campaign.include_risky ? ["deliverable", "risky"] : ["deliverable"];
+  const { data: eligibleContacts, error: contactsError } = await supabase
+    .from("contacts")
+    .select("email")
+    .eq("contact_list_id", campaign.contact_list_id)
+    .in("status", statuses);
+  if (contactsError) throw contactsError;
+
+  const { data: unsubs, error: unsubError } = await supabase
+    .from("unsubscribes")
+    .select("email")
+    .eq("user_id", campaign.user_id);
+  if (unsubError) throw unsubError;
+  const unsubSet = new Set((unsubs ?? []).map((u) => u.email));
+
+  const recipientCount = (eligibleContacts ?? []).filter(
+    (c) => !unsubSet.has(c.email.toLowerCase()),
+  ).length;
+
+  const { data: latestJob } = await supabase
+    .from("send_jobs")
+    .select("id, status, total_recipients, sent_count, failed_count")
+    .eq("campaign_id", campaign.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let failedRecipients: { email: string; error_message: string | null }[] = [];
+  if (latestJob && campaign.status === "sent" && latestJob.failed_count > 0) {
+    const { data } = await supabase
+      .from("campaign_recipients")
+      .select("email, error_message")
+      .eq("send_job_id", latestJob.id)
+      .eq("status", "failed");
+    failedRecipients = data ?? [];
+  }
+
+  const isDraft = campaign.status === "draft";
+  const canSend = Boolean(campaign.subject?.trim() && campaign.body?.trim());
+
+  return (
+    <div className="mx-auto max-w-4xl px-4 py-10">
+      <div className="mb-8 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold text-gray-900">{campaign.name}</h1>
+        <Link
+          href={`/campaigns/${campaign.id}/audience`}
+          className="text-sm text-indigo-600 hover:underline"
+        >
+          Back to Audience
+        </Link>
+      </div>
+
+      <div className="mb-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        {isDraft ? (
+          <ComposeForm
+            campaignId={campaign.id}
+            initialSubject={campaign.subject ?? ""}
+            initialBody={campaign.body ?? ""}
+            initialReplyTo={campaign.reply_to ?? ""}
+            ownEmail={user.email ?? ""}
+          />
+        ) : (
+          <div>
+            <p className="mb-1 text-xs text-gray-400">Subject</p>
+            <p className="mb-4 font-medium text-gray-900">{campaign.subject}</p>
+            <p className="mb-1 text-xs text-gray-400">Body</p>
+            <p className="whitespace-pre-wrap text-sm text-gray-800">{campaign.body}</p>
+          </div>
+        )}
+      </div>
+
+      <SendPanel
+        campaignId={campaign.id}
+        canSend={canSend}
+        recipientCount={recipientCount}
+        campaignStatus={campaign.status}
+        initialJobId={latestJob?.id ?? null}
+        initialSummary={
+          latestJob
+            ? {
+                totalRecipients: latestJob.total_recipients,
+                sentCount: latestJob.sent_count,
+                failedCount: latestJob.failed_count,
+              }
+            : null
+        }
+      />
+
+      {failedRecipients.length > 0 && (
+        <div className="mt-6 overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead>
+              <tr className="text-left text-gray-500">
+                <th className="px-4 py-2 font-medium">Failed recipient</th>
+                <th className="px-4 py-2 font-medium">Reason</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {failedRecipients.map((r, i) => (
+                <tr key={i}>
+                  <td className="px-4 py-2 text-gray-900">{r.email}</td>
+                  <td className="px-4 py-2 text-gray-600">{r.error_message}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

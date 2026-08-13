@@ -2,6 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 
+const STATUS_STYLES: Record<string, string> = {
+  draft: "bg-gray-100 text-gray-700",
+  sending: "bg-yellow-100 text-yellow-700",
+  sent: "bg-green-100 text-green-700",
+  failed: "bg-red-100 text-red-700",
+};
+
 export default async function CampaignsPage() {
   const supabase = createClient();
   const {
@@ -32,11 +39,15 @@ export default async function CampaignsPage() {
           {campaigns.map((c) => (
             <li key={c.id}>
               <Link
-                href={`/campaigns/${c.id}/audience`}
+                href={`/campaigns/${c.id}/${c.status === "draft" ? "audience" : "compose"}`}
                 className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
               >
                 <span className="font-medium text-gray-900">{c.name}</span>
-                <span className="text-sm capitalize text-gray-500">{c.status}</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[c.status] ?? "bg-gray-100 text-gray-700"}`}
+                >
+                  {c.status}
+                </span>
               </Link>
             </li>
           ))}
