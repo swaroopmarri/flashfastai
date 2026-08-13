@@ -32,6 +32,35 @@ export async function createCampaign(name: string, contactListId: string) {
   redirect(`/campaigns/${campaign.id}/audience`);
 }
 
+/** "Start campaign with this company" from My Network -- creates a
+ * domain-scoped (not list-scoped) draft campaign, defaulting to
+ * deliverable-only, and jumps straight to its Audience step. */
+export async function createCompanyCampaign(domain: string) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const membership = await getCurrentMembership(supabase);
+
+  const { data: campaign, error } = await supabase
+    .from("campaigns")
+    .insert({
+      user_id: user.id,
+      name: `${domain} campaign`,
+      company_domain: domain,
+      organization_id: membership?.organization_id ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (error) throw error;
+
+  revalidatePath("/campaigns");
+  redirect(`/campaigns/${campaign.id}/audience`);
+}
+
 export async function updateAudience(campaignId: string, includeRisky: boolean) {
   const supabase = createClient();
   const { error } = await supabase

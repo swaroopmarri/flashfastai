@@ -41,6 +41,7 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    - `supabase/migrations/0003_fix_membership_backfill.sql` — a corrected re-run of that backfill (0002's version missed accounts that didn't have a contact list yet at the time it ran); safe to run even if you already ran 0002 successfully.
    - `supabase/migrations/0004_campaign_sending.sql` — adds campaign content fields, `send_jobs`, `campaign_recipients`, `unsubscribes`, and the public unsubscribe function.
    - `supabase/migrations/0005_contact_list_summaries.sql` — adds `get_contact_list_status_counts()`, a grouped-aggregate function backing the Contacts overview cards.
+   - `supabase/migrations/0006_network.sql` — adds "My Network" (company/domain grouping across every list) and lets verification jobs and campaigns target a company domain instead of only one list.
 
 ## Setting up Amazon SES
 
@@ -95,7 +96,10 @@ Sends to unverified addresses while still in sandbox mode fail per-recipient wit
 - `supabase/migrations/0003_fix_membership_backfill.sql` — corrected backfill for accounts 0002 missed
 - `supabase/migrations/0004_campaign_sending.sql` — campaign content fields, send jobs, per-recipient tracking, unsubscribe suppression
 - `supabase/migrations/0005_contact_list_summaries.sql` — `get_contact_list_status_counts()`, a single grouped-aggregate query backing the Contacts overview cards
+- `supabase/migrations/0006_network.sql` — `get_network_domain_counts()` / `get_network_domain_contacts()` (deduplicated by email, across every list) and the schema changes letting verification/campaigns target a domain instead of one list
 - `src/app/api/contacts/[listId]/export` — downloads all contacts in a list as CSV (email, name, company, status, zerobounce_sub_status, verified_at)
+- `src/app/(app)/network` — My Network: one card per company (email domain) across all your lists; `[domain]` is the detail view with deduplicated contacts, per-contact list tags, a "Verify all unverified" button, and "Start campaign with this company"
+- `src/app/(app)/_components/VerifyPanel.tsx` — shared verify-and-poll UI used by both the list detail page and a company's network page (takes a `target: {type:"list"|"company"}` prop)
 
 ## Organizations, invites, and quotas
 
@@ -126,6 +130,12 @@ Sends to unverified addresses while still in sandbox mode fail per-recipient wit
 5. **Per-recipient failures** (e.g. an unverified address while SES is in sandbox mode) are caught individually — one failure never aborts the batch — and stored with SES's actual error message, shown in a table under the send summary once the job completes.
 6. **Unsubscribe**: every email includes an unsubscribe link unique to that send. Clicking it (no login required) inserts into `unsubscribes` for that sender, marks every matching contact across all of that sender's lists as `unsubscribed`, and is checked at the start of every future send — not optional, not per-list.
 7. Once every recipient has been processed, the campaign's status flips to `sent` (or stays viewable mid-send as `sending`).
+
+## How My Network works
+
+- Every contact across every list you own is grouped by email domain (`swiftit-solutions.com`, etc.), deduplicated by lowercased/trimmed email — the same email in three different lists counts once.
+- When copies disagree (e.g. verified in one list, still pending in another, uploaded a second time with a different name), a "best" row is picked: a non-`pending_verification` status wins over pending, then the most recently verified/created copy — the overview cards and the company detail page always agree on this.
+- Both **verification** and **campaigns** now support two audience scopes, not just one list: `verification_jobs` and `campaigns` can have either a `contact_list_id` (unchanged, single-list behavior) or a `company_domain` (spans every list). Same job/send machinery either way — "Verify all unverified" on a company page runs the identical single/bulk ZeroBounce flow as the per-list Verify Contacts button, just querying by email domain instead of one `contact_list_id`, and updates every matching row across every list so copies stay in sync. "Start campaign with this company" creates a `company_domain`-scoped campaign and drops you at its Audience step, defaulting to deliverable-only.
 
 ## Known limitation
 

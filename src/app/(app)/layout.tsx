@@ -39,6 +39,7 @@ export default async function AppLayout({
             <nav className="flex items-center gap-1">
               <NavLink href="/dashboard">Dashboard</NavLink>
               <NavLink href="/contacts">Contacts</NavLink>
+              <NavLink href="/network">My Network</NavLink>
               <NavLink href="/campaigns">Campaigns</NavLink>
               {membership?.role === "admin" && <NavLink href="/team">Team</NavLink>}
             </nav>

@@ -2,7 +2,7 @@ import { Fragment } from "react";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { UploadForm } from "../UploadForm";
-import { VerifyPanel } from "./VerifyPanel";
+import { VerifyPanel } from "../../_components/VerifyPanel";
 
 const STATUS_STYLES: Record<string, string> = {
   pending_verification: "bg-gray-100 text-gray-700",
@@ -102,7 +102,7 @@ export default async function ContactListPage({
 
       <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <VerifyPanel
-          listId={list.id}
+          target={{ type: "list", listId: list.id }}
           pendingCount={pendingCount}
           activeJobId={activeJob?.id ?? null}
         />

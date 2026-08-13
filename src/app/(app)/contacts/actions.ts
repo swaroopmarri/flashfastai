@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import {
   startVerification as startVerificationLib,
+  startCompanyVerification as startCompanyVerificationLib,
   type StartVerificationResult,
 } from "@/lib/verification";
 import { getCurrentMembership } from "@/lib/organizations";
@@ -93,5 +94,14 @@ export async function startVerificationAction(
   const supabase = createClient();
   const result = await startVerificationLib(supabase, listId);
   revalidatePath(`/contacts/${listId}`);
+  return result;
+}
+
+export async function startCompanyVerificationAction(
+  domain: string,
+): Promise<StartVerificationResult> {
+  const supabase = createClient();
+  const result = await startCompanyVerificationLib(supabase, domain);
+  revalidatePath(`/network/${domain}`);
   return result;
 }

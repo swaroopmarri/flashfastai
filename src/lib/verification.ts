@@ -10,6 +10,10 @@ import { getCurrentMembership } from "@/lib/organizations";
 
 const BULK_THRESHOLD = 50;
 
+export type VerificationScope =
+  | { type: "list"; contactListId: string }
+  | { type: "company"; domain: string };
+
 export interface VerificationSummary {
   deliverable: number;
   risky: number;
@@ -27,45 +31,71 @@ const QUOTA_EXCEEDED_MESSAGE =
 const NOT_ACTIVE_MESSAGE =
   "Your organization membership isn't active yet. Contact your admin.";
 
+/**
+ * Updates every contact row matching an email, scoped to one list when
+ * `contactListId` is set or across every list the caller owns (RLS still
+ * restricts to their own rows) when it's a company-wide verification --
+ * so if the same email exists in multiple lists, verifying it once via
+ * "My Network" keeps every copy in sync instead of only one.
+ */
 async function applyResults(
   supabase: SupabaseClient,
-  contactListId: string,
+  scope: VerificationScope,
   results: { email: string; status: SimplifiedStatus; subStatus: string | null }[],
 ): Promise<VerificationSummary> {
   const summary: VerificationSummary = { deliverable: 0, risky: 0, undeliverable: 0 };
 
   for (const result of results) {
     summary[result.status]++;
-    await supabase
+    let query = supabase
       .from("contacts")
       .update({
         status: result.status,
         zerobounce_sub_status: result.subStatus,
         verified_at: new Date().toISOString(),
       })
-      .eq("contact_list_id", contactListId)
       .eq("email", result.email.trim().toLowerCase());
+
+    if (scope.type === "list") {
+      query = query.eq("contact_list_id", scope.contactListId);
+    }
+
+    await query;
   }
 
   return summary;
 }
 
-export async function startVerification(
+async function fetchPendingEmails(
   supabase: SupabaseClient,
-  contactListId: string,
-): Promise<StartVerificationResult> {
-  const { data: pending, error } = await supabase
-    .from("contacts")
-    .select("email")
-    .eq("contact_list_id", contactListId)
-    .eq("status", "pending_verification");
+  scope: VerificationScope,
+): Promise<string[]> {
+  let query = supabase.from("contacts").select("email").eq("status", "pending_verification");
 
+  query =
+    scope.type === "list"
+      ? query.eq("contact_list_id", scope.contactListId)
+      : query.ilike("email", `%@${scope.domain}`);
+
+  const { data, error } = await query;
   if (error) throw error;
-  if (!pending || pending.length === 0) {
+
+  // Company scope can return the same email more than once (present in
+  // multiple lists) -- dedupe so we don't pay quota or call ZeroBounce
+  // twice for one address.
+  return Array.from(
+    new Set((data ?? []).map((c) => (c.email as string).trim().toLowerCase())),
+  );
+}
+
+async function startVerificationForScope(
+  supabase: SupabaseClient,
+  scope: VerificationScope,
+): Promise<StartVerificationResult> {
+  const emails = await fetchPendingEmails(supabase, scope);
+  if (emails.length === 0) {
     return { mode: "none" };
   }
-
-  const emails = pending.map((c) => c.email as string);
 
   // try_consume_quota() only matches memberships with status = 'active' and
   // returns a plain false either way, so check membership state ourselves
@@ -85,11 +115,22 @@ export async function startVerification(
     return { mode: "quota_exceeded", message: QUOTA_EXCEEDED_MESSAGE };
   }
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated.");
+
+  const jobBase =
+    scope.type === "list"
+      ? { contact_list_id: scope.contactListId, company_domain: null }
+      : { contact_list_id: null, company_domain: scope.domain };
+
   if (emails.length <= BULK_THRESHOLD) {
     const results = await validateBatch(emails);
-    const summary = await applyResults(supabase, contactListId, results);
+    const summary = await applyResults(supabase, scope, results);
     await supabase.from("verification_jobs").insert({
-      contact_list_id: contactListId,
+      ...jobBase,
+      user_id: user.id,
       mode: "single",
       status: "completed",
       total_contacts: emails.length,
@@ -105,7 +146,8 @@ export async function startVerification(
   const { data: job, error: jobError } = await supabase
     .from("verification_jobs")
     .insert({
-      contact_list_id: contactListId,
+      ...jobBase,
+      user_id: user.id,
       mode: "bulk",
       zerobounce_file_id: fileId,
       status: "processing",
@@ -117,6 +159,20 @@ export async function startVerification(
   if (jobError) throw jobError;
 
   return { mode: "bulk", jobId: job.id as string };
+}
+
+export async function startVerification(
+  supabase: SupabaseClient,
+  contactListId: string,
+): Promise<StartVerificationResult> {
+  return startVerificationForScope(supabase, { type: "list", contactListId });
+}
+
+export async function startCompanyVerification(
+  supabase: SupabaseClient,
+  domain: string,
+): Promise<StartVerificationResult> {
+  return startVerificationForScope(supabase, { type: "company", domain });
 }
 
 export interface JobPollResult {
@@ -176,8 +232,11 @@ export async function pollVerificationJob(
   }
 
   // zbStatus === "Complete"
+  const scope: VerificationScope = job.contact_list_id
+    ? { type: "list", contactListId: job.contact_list_id }
+    : { type: "company", domain: job.company_domain };
   const results = await getBulkFileResult(job.zerobounce_file_id);
-  const summary = await applyResults(supabase, job.contact_list_id, results);
+  const summary = await applyResults(supabase, scope, results);
 
   await supabase
     .from("verification_jobs")

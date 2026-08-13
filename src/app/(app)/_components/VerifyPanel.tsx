@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { startVerificationAction } from "../actions";
+import { startVerificationAction, startCompanyVerificationAction } from "../contacts/actions";
+
+export type VerifyTarget =
+  | { type: "list"; listId: string }
+  | { type: "company"; domain: string };
 
 interface Summary {
   deliverable: number;
@@ -20,13 +24,17 @@ type PanelState =
 const POLL_INTERVAL_MS = 6000;
 
 export function VerifyPanel({
-  listId,
+  target,
   pendingCount,
   activeJobId,
+  label = "Verify contacts",
+  buttonLabel = "Verify Contacts",
 }: {
-  listId: string;
+  target: VerifyTarget;
   pendingCount: number;
   activeJobId: string | null;
+  label?: string;
+  buttonLabel?: string;
 }) {
   const [state, setState] = useState<PanelState>(
     activeJobId ? { phase: "polling" } : { phase: "idle" },
@@ -69,7 +77,11 @@ export function VerifyPanel({
   async function handleVerify() {
     setState({ phase: "starting" });
     try {
-      const result = await startVerificationAction(listId);
+      const result =
+        target.type === "list"
+          ? await startVerificationAction(target.listId)
+          : await startCompanyVerificationAction(target.domain);
+
       if (result.mode === "none") {
         setState({ phase: "error", message: "No contacts are pending verification." });
       } else if (result.mode === "quota_exceeded") {
@@ -92,7 +104,7 @@ export function VerifyPanel({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-gray-900">Verify contacts</h2>
+        <h2 className="text-lg font-medium text-gray-900">{label}</h2>
         <button
           onClick={handleVerify}
           disabled={pendingCount === 0 || state.phase === "starting" || state.phase === "polling"}
@@ -102,7 +114,7 @@ export function VerifyPanel({
             ? "Starting..."
             : state.phase === "polling"
               ? "Verifying..."
-              : "Verify Contacts"}
+              : buttonLabel}
         </button>
       </div>
 
@@ -113,8 +125,8 @@ export function VerifyPanel({
       {state.phase === "polling" && (
         <p className="mt-3 flex items-center gap-2 text-sm text-indigo-700">
           <span className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-700" />
-          Verifying against ZeroBounce — larger lists can take a few minutes. You
-          can leave this page and come back; verification continues in the
+          Verifying against ZeroBounce — larger batches can take a few minutes.
+          You can leave this page and come back; verification continues in the
           background.
         </p>
       )}

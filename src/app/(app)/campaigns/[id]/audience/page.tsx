@@ -16,25 +16,39 @@ export default async function AudiencePage({
 
   const { data: campaign } = await supabase
     .from("campaigns")
-    .select("id, name, include_risky, contact_list_id, contact_lists(name)")
+    .select("id, name, include_risky, contact_list_id, company_domain, contact_lists(name)")
     .eq("id", params.id)
     .maybeSingle();
 
-  if (!campaign || !campaign.contact_list_id) notFound();
-
-  const { data: contacts, error } = await supabase
-    .from("contacts")
-    .select("status")
-    .eq("contact_list_id", campaign.contact_list_id);
-
-  if (error) throw error;
+  if (!campaign || (!campaign.contact_list_id && !campaign.company_domain)) notFound();
 
   const counts = { deliverable: 0, risky: 0, undeliverable: 0, pending_verification: 0 };
-  for (const c of contacts ?? []) {
-    counts[c.status as keyof typeof counts]++;
+
+  if (campaign.contact_list_id) {
+    const { data: contacts, error } = await supabase
+      .from("contacts")
+      .select("status")
+      .eq("contact_list_id", campaign.contact_list_id);
+    if (error) throw error;
+    for (const c of contacts ?? []) {
+      if (c.status in counts) counts[c.status as keyof typeof counts]++;
+    }
+  } else {
+    const { data: contacts, error } = await supabase.rpc("get_network_domain_contacts", {
+      p_domain: campaign.company_domain,
+    });
+    if (error) throw error;
+    for (const c of contacts ?? []) {
+      if (c.status in counts) counts[c.status as keyof typeof counts]++;
+    }
   }
 
   const listName = (campaign.contact_lists as unknown as { name: string } | null)?.name;
+  const audienceHref = campaign.contact_list_id
+    ? `/contacts/${campaign.contact_list_id}`
+    : `/network/${campaign.company_domain}`;
+  const audienceLabel = campaign.contact_list_id ? "List" : "Company";
+  const audienceName = campaign.contact_list_id ? listName : campaign.company_domain;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
@@ -43,12 +57,9 @@ export default async function AudiencePage({
       <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="mb-1 text-lg font-medium text-gray-900">Audience</h2>
         <p className="mb-4 text-sm text-gray-500">
-          List:{" "}
-          <Link
-            href={`/contacts/${campaign.contact_list_id}`}
-            className="text-indigo-600 hover:underline"
-          >
-            {listName}
+          {audienceLabel}:{" "}
+          <Link href={audienceHref} className="text-indigo-600 hover:underline">
+            {audienceName}
           </Link>
         </p>
 
@@ -67,13 +78,11 @@ export default async function AudiencePage({
         {counts.pending_verification > 0 && (
           <p className="mb-4 rounded-md bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
             {counts.pending_verification} contact
-            {counts.pending_verification === 1 ? "" : "s"} on this list{" "}
+            {counts.pending_verification === 1 ? "" : "s"} in this{" "}
+            {audienceLabel.toLowerCase()}{" "}
             {counts.pending_verification === 1 ? "hasn't" : "haven't"} been
             verified yet and won&apos;t be included in this campaign.{" "}
-            <Link
-              href={`/contacts/${campaign.contact_list_id}`}
-              className="underline"
-            >
+            <Link href={audienceHref} className="underline">
               Verify them
             </Link>
             .

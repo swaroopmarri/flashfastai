@@ -18,19 +18,19 @@ export default async function ComposePage({
   const { data: campaign } = await supabase
     .from("campaigns")
     .select(
-      "id, name, subject, body, reply_to, status, contact_list_id, include_risky, user_id",
+      "id, name, subject, body, reply_to, status, contact_list_id, company_domain, include_risky, user_id",
     )
     .eq("id", params.id)
     .maybeSingle();
 
-  if (!campaign || !campaign.contact_list_id) notFound();
+  if (!campaign || (!campaign.contact_list_id && !campaign.company_domain)) notFound();
 
   const statuses = campaign.include_risky ? ["deliverable", "risky"] : ["deliverable"];
-  const { data: eligibleContacts, error: contactsError } = await supabase
-    .from("contacts")
-    .select("email")
-    .eq("contact_list_id", campaign.contact_list_id)
-    .in("status", statuses);
+  let eligibleQuery = supabase.from("contacts").select("email").in("status", statuses);
+  eligibleQuery = campaign.contact_list_id
+    ? eligibleQuery.eq("contact_list_id", campaign.contact_list_id)
+    : eligibleQuery.ilike("email", `%@${campaign.company_domain}`);
+  const { data: eligibleContacts, error: contactsError } = await eligibleQuery;
   if (contactsError) throw contactsError;
 
   const { data: unsubs, error: unsubError } = await supabase
@@ -40,9 +40,11 @@ export default async function ComposePage({
   if (unsubError) throw unsubError;
   const unsubSet = new Set((unsubs ?? []).map((u) => u.email));
 
-  const recipientCount = (eligibleContacts ?? []).filter(
-    (c) => !unsubSet.has(c.email.toLowerCase()),
-  ).length;
+  const recipientCount = new Set(
+    (eligibleContacts ?? [])
+      .map((c) => c.email.toLowerCase())
+      .filter((email) => !unsubSet.has(email)),
+  ).size;
 
   const { data: latestJob } = await supabase
     .from("send_jobs")
