@@ -26,14 +26,16 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | An IAM user scoped to SES — see **Setting up Amazon SES** below |
    | `AWS_REGION` | The AWS region your SES identity is verified in, e.g. `us-east-1` |
    | `SES_FROM_ADDRESS` | The verified sender address campaigns send from, e.g. `campaigns@flashfastai.com` |
+   | `SES_NOTIFICATIONS_SECRET` | Any long random string you generate — optional, only needed for SES bounce/complaint feedback (see **Setting up SES bounce and complaint feedback**) |
 
    The two `NEXT_PUBLIC_` values are safe to expose in the browser — they're scoped by Supabase Row Level Security, not secrets. The rest are server-only and must never be prefixed with `NEXT_PUBLIC_`:
    - `ZEROBOUNCE_API_KEY` is only read in Server Actions / Route Handlers.
-   - `SUPABASE_SERVICE_ROLE_KEY` is **extremely sensitive** — it bypasses every RLS policy in the database. It's used in exactly one place (`src/utils/supabase/admin.ts`), imported only by the cron quota-reset route. Do not reuse it anywhere else.
+   - `SUPABASE_SERVICE_ROLE_KEY` is **extremely sensitive** — it bypasses every RLS policy in the database. It's used in exactly one place (`src/utils/supabase/admin.ts`), imported only by the cron quota-reset route and the SES notifications webhook (both act outside any one user's session, so they can't go through the normal RLS-scoped client). Do not reuse it anywhere else.
    - `CRON_SECRET` protects `/api/cron/reset-quotas` from being invoked by anyone else. Vercel automatically sends it as a Bearer token when it triggers the cron job, once the same value is set in your Vercel project.
    - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are only read in `src/lib/ses.ts`, called from Server Actions and the send-job poll route — never bundled to the client.
+   - `SES_NOTIFICATIONS_SECRET` protects `/api/ses/notifications` the same way `CRON_SECRET` protects the cron route — it's a query-string token (`?secret=...`) rather than a header, since that's what an SNS HTTPS subscription URL supports.
 
-   In **Vercel**, add all eight under Project → Settings → Environment Variables (check Production, Preview, and Development), then redeploy — env var changes don't apply to already-running deployments.
+   In **Vercel**, add all nine under Project → Settings → Environment Variables (check Production, Preview, and Development), then redeploy — env var changes don't apply to already-running deployments.
 
 4. Run the database migrations, **in order**. Open the Supabase dashboard → **SQL Editor → New query** for each:
    - `supabase/migrations/0001_contacts_and_campaigns.sql` — creates `contact_lists`, `contacts`, `verification_jobs`, `campaigns`.
@@ -42,6 +44,7 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    - `supabase/migrations/0004_campaign_sending.sql` — adds campaign content fields, `send_jobs`, `campaign_recipients`, `unsubscribes`, and the public unsubscribe function.
    - `supabase/migrations/0005_contact_list_summaries.sql` — adds `get_contact_list_status_counts()`, a grouped-aggregate function backing the Contacts overview cards.
    - `supabase/migrations/0006_network.sql` — adds "My Network" (company/domain grouping across every list) and lets verification jobs and campaigns target a company domain instead of only one list.
+   - `supabase/migrations/0007_suppression.sql` — adds a `reason` column to `unsubscribes` (unsubscribe-link click vs. SES spam complaint), a `resubscribe_log` audit table, and `resubscribe_contact()` for manual resubscribes.
 
 ## Setting up Amazon SES
 
@@ -69,6 +72,17 @@ Sends to unverified addresses while still in sandbox mode fail per-recipient wit
    ```
 
    Open [http://localhost:3000](http://localhost:3000).
+
+### Setting up SES bounce and complaint feedback (optional)
+
+Everything else in this app works without this — sending, verification, unsubscribe links, and the Bounced/Undeliverable and Unsubscribed groups on the Suppression List page all work regardless. This step only wires up the third group, **Spam complaints**, plus real post-send bounce detection (as opposed to ZeroBounce's pre-send prediction). Skip it and that group just stays empty.
+
+1. **Create an SNS topic** (any region — doesn't need to match `AWS_REGION`, though same-region is simplest): SNS console → **Topics → Create topic** (Standard type is fine).
+2. **Subscribe your webhook to it**: on that topic → **Create subscription** → protocol **HTTPS** → endpoint `https://<your-app-domain>/api/ses/notifications?secret=<SES_NOTIFICATIONS_SECRET>` (the same value you set for that env var). SNS immediately POSTs a subscription-confirmation handshake to that URL, which the route handles automatically — no separate confirmation click needed, but check the subscription shows **Confirmed** in the SNS console after a few seconds.
+3. **Point SES at that topic**: SES console → **Verified identities** → your domain/address → **Notifications** tab → set both **Bounce feedback** and **Complaint feedback** to the SNS topic you just created.
+4. That's it — real bounces and complaints on future sends now flow into the Suppression List page automatically. Nothing needs to change on the ZeroBounce/verification side.
+
+This endpoint is protected by the `secret` query param, not full SNS message-signature verification — sufficient to stop opportunistic abuse of a discovered URL, but not as strong as cryptographically verifying every request came from AWS. If you want that stronger guarantee, `src/app/api/ses/notifications/route.ts` is where to add it.
 
 ## Structure
 
@@ -100,6 +114,10 @@ Sends to unverified addresses while still in sandbox mode fail per-recipient wit
 - `src/app/api/contacts/[listId]/export` — downloads all contacts in a list as CSV (email, name, company, status, zerobounce_sub_status, verified_at)
 - `src/app/(app)/network` — My Network: one card per company (email domain) across all your lists; `[domain]` is the detail view with deduplicated contacts, per-contact list tags, a "Verify all unverified" button, and "Start campaign with this company"
 - `src/app/(app)/_components/VerifyPanel.tsx` — shared verify-and-poll UI used by both the list detail page and a company's network page (takes a `target: {type:"list"|"company"}` prop)
+- `src/app/(app)/suppression` — Suppression List page: spam complaints, unsubscribes, and bounced/undeliverable contacts (grouped by reason), each unsubscribe/complaint row has a "Resubscribe" button behind a confirmation step
+- `src/app/(app)/_components/ResubscribeButton.tsx` — the confirm-then-resubscribe UI for one email
+- `src/app/api/ses/notifications` — webhook SES's SNS topic posts bounce/complaint feedback to; protected by a `?secret=` query token (`SES_NOTIFICATIONS_SECRET`)
+- `src/lib/sesFeedback.ts` — applies a complaint (adds to `unsubscribes`, reason `'complaint'`) or a permanent bounce (marks the contact `undeliverable`) once the webhook has matched an SES notification back to a specific recipient
 
 ## Organizations, invites, and quotas
 
@@ -136,6 +154,14 @@ Sends to unverified addresses while still in sandbox mode fail per-recipient wit
 - Every contact across every list you own is grouped by email domain (`swiftit-solutions.com`, etc.), deduplicated by lowercased/trimmed email — the same email in three different lists counts once.
 - When copies disagree (e.g. verified in one list, still pending in another, uploaded a second time with a different name), a "best" row is picked: a non-`pending_verification` status wins over pending, then the most recently verified/created copy — the overview cards and the company detail page always agree on this.
 - Both **verification** and **campaigns** now support two audience scopes, not just one list: `verification_jobs` and `campaigns` can have either a `contact_list_id` (unchanged, single-list behavior) or a `company_domain` (spans every list). Same job/send machinery either way — "Verify all unverified" on a company page runs the identical single/bulk ZeroBounce flow as the per-list Verify Contacts button, just querying by email domain instead of one `contact_list_id`, and updates every matching row across every list so copies stay in sync. "Start campaign with this company" creates a `company_domain`-scoped campaign and drops you at its Audience step, defaulting to deliverable-only.
+
+## How the Suppression List works
+
+- **Three groups, three sources**: Bounced/Undeliverable (red, grouped by `zerobounce_sub_status`) comes straight from `contacts.status = 'undeliverable'` — either ZeroBounce's pre-send prediction, or (labeled `ses_<subtype>`) a real permanent bounce reported after an actual send. Unsubscribed (grey) and Spam complaints (orange) are both rows in `unsubscribes`, distinguished by its `reason` column (`'unsubscribe_link'` vs. `'complaint'`) — same table, same enforcement path, just a different cause.
+- **Complaints reuse the unsubscribe path on purpose.** `applyComplaint()` in `src/lib/sesFeedback.ts` inserts into `unsubscribes` exactly the way `unsubscribe_by_token()` already does, just tagged `reason: 'complaint'`. That means every place that already excludes unsubscribes from a send — the Audience step's counts, `campaignSend.ts`'s recipient query, the `contacts.status` filter — excludes complaints too, automatically, with no separate code path to keep in sync or forget.
+- **Re-import protection**: `createContactList` and `mergeContacts` (`src/app/(app)/contacts/actions.ts`) check every uploaded email against the user's `unsubscribes` table before inserting. A suppressed email is never inserted as `pending_verification` — new lists skip it entirely, and merges into an existing list leave that contact's row (and its `unsubscribed` status) untouched. The upload preview shows a count of how many rows were excluded this way, checked via a `checkSuppressedEmails` Server Action right after parsing — informational only; the real enforcement happens again, server-side, in the two actions regardless of what the client saw.
+- **Manual resubscribe** goes through `resubscribe_contact()` (migration 0007), not a plain client-side delete: it deletes the `unsubscribes` row, reverts every matching contact back to `pending_verification` (never straight back to `deliverable` — it has to be re-verified before it can be mailed again), and writes a `resubscribe_log` row (who, when, and what was reversed) — all in one transaction. The UI requires an explicit "Are you sure?" confirmation naming the original opt-out date before calling it.
+- **SES bounce/complaint feedback is opt-in infrastructure**, not just a UI toggle — see **Setting up SES bounce and complaint feedback** above. Without it, the Spam complaints group is simply always empty; nothing else about suppression depends on it.
 
 ## Known limitation
 

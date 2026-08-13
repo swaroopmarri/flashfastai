@@ -28,6 +28,41 @@ function dedupeRows(rows: ParsedContactRow[]): ParsedContactRow[] {
   return Array.from(byEmail.values());
 }
 
+/** The `unsubscribes` table is the authoritative, user-wide suppression
+ * list (see migration 0004) -- checked here so a suppressed email can
+ * never re-enter a sendable state just by being re-uploaded into a list
+ * (new or existing) it doesn't already appear in. */
+async function getSuppressedEmails(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  emails: string[],
+): Promise<Set<string>> {
+  if (emails.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from("unsubscribes")
+    .select("email")
+    .eq("user_id", userId)
+    .in("email", emails);
+  if (error) throw error;
+  return new Set((data ?? []).map((r) => r.email as string));
+}
+
+/** Client-side preview check, called right after parsing a file so the
+ * upload preview can flag "already unsubscribed, excluded" before the
+ * user ever submits -- the actual exclusion is enforced again, server-side,
+ * in createContactList/mergeContacts regardless of what the client saw. */
+export async function checkSuppressedEmails(emails: string[]): Promise<string[]> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const normalized = emails.map((e) => e.trim().toLowerCase());
+  const suppressed = await getSuppressedEmails(supabase, user.id, normalized);
+  return Array.from(suppressed);
+}
+
 export async function createContactList(name: string, rows: ParsedContactRow[]) {
   const supabase = createClient();
   const {
@@ -50,9 +85,16 @@ export async function createContactList(name: string, rows: ParsedContactRow[]) 
   if (listError) throw listError;
 
   const deduped = dedupeRows(rows);
-  if (deduped.length > 0) {
+  const suppressed = await getSuppressedEmails(
+    supabase,
+    user.id,
+    deduped.map((r) => r.email),
+  );
+  const importable = deduped.filter((r) => !suppressed.has(r.email));
+
+  if (importable.length > 0) {
     const { error: contactsError } = await supabase.from("contacts").insert(
-      deduped.map((row) => ({
+      importable.map((row) => ({
         contact_list_id: list.id,
         email: row.email,
         name: row.name || null,
@@ -68,13 +110,27 @@ export async function createContactList(name: string, rows: ParsedContactRow[]) 
 
 export async function mergeContacts(listId: string, rows: ParsedContactRow[]) {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
   const deduped = dedupeRows(rows);
-  if (deduped.length > 0) {
-    // Omitting `status` here means new rows get the column default
-    // (pending_verification) while existing rows keep their current status.
+  // Suppressed emails already present in this list keep their existing
+  // 'unsubscribed' status untouched below (status is omitted from the
+  // upsert payload, so ON CONFLICT never overwrites it); this only needs
+  // to stop a suppressed email from being freshly INSERTed as
+  // pending_verification into a list it isn't already in.
+  const suppressed = await getSuppressedEmails(
+    supabase,
+    user.id,
+    deduped.map((r) => r.email),
+  );
+  const importable = deduped.filter((r) => !suppressed.has(r.email));
+
+  if (importable.length > 0) {
     const { error } = await supabase.from("contacts").upsert(
-      deduped.map((row) => ({
+      importable.map((row) => ({
         contact_list_id: listId,
         email: row.email,
         name: row.name || null,
@@ -104,4 +160,20 @@ export async function startCompanyVerificationAction(
   const result = await startCompanyVerificationLib(supabase, domain);
   revalidatePath(`/network/${domain}`);
   return result;
+}
+
+/** Manual resubscribe -- compliance-sensitive, so the actual delete +
+ * status revert + audit-log write happens atomically in the
+ * resubscribe_contact() Postgres function (migration 0007), not here. */
+export async function resubscribeContactAction(email: string): Promise<{ error?: string }> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { error } = await supabase.rpc("resubscribe_contact", { p_email: email });
+  revalidatePath("/suppression");
+  if (error) return { error: error.message };
+  return {};
 }

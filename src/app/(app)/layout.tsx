@@ -41,6 +41,7 @@ export default async function AppLayout({
               <NavLink href="/contacts">Contacts</NavLink>
               <NavLink href="/network">My Network</NavLink>
               <NavLink href="/campaigns">Campaigns</NavLink>
+              <NavLink href="/suppression">Suppression List</NavLink>
               {membership?.role === "admin" && <NavLink href="/team">Team</NavLink>}
             </nav>
           </div>

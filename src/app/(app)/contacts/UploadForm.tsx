@@ -2,7 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { parseContactsFile } from "@/lib/parseContactsFile";
-import { createContactList, mergeContacts, type ParsedContactRow } from "./actions";
+import {
+  createContactList,
+  mergeContacts,
+  checkSuppressedEmails,
+  type ParsedContactRow,
+} from "./actions";
 
 type Props =
   | { mode: "create" }
@@ -11,9 +16,11 @@ type Props =
 export function UploadForm(props: Props) {
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<{ rows: ParsedContactRow[]; skipped: number } | null>(
-    null,
-  );
+  const [preview, setPreview] = useState<{
+    rows: ParsedContactRow[];
+    skipped: number;
+    suppressedCount: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -28,7 +35,13 @@ export function UploadForm(props: Props) {
         setError("No valid email addresses were found in that file.");
         return;
       }
-      setPreview(result);
+      // Checked here (before submit) purely so the preview can flag
+      // already-unsubscribed rows; the actual exclusion happens
+      // server-side regardless, in createContactList/mergeContacts.
+      const suppressed = await checkSuppressedEmails(result.rows.map((r) => r.email));
+      const suppressedSet = new Set(suppressed);
+      const rows = result.rows.filter((r) => !suppressedSet.has(r.email.toLowerCase()));
+      setPreview({ rows, skipped: result.skipped, suppressedCount: suppressedSet.size });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not parse that file.");
     }
@@ -101,9 +114,27 @@ export function UploadForm(props: Props) {
         </p>
       )}
 
+      {preview && preview.suppressedCount > 0 && (
+        <p className="rounded-md bg-gray-100 px-3 py-2 text-sm text-gray-600">
+          {preview.suppressedCount} email{preview.suppressedCount === 1 ? "" : "s"} already
+          unsubscribed, excluded — see the{" "}
+          <a href="/suppression" className="underline">
+            Suppression List
+          </a>
+          .
+        </p>
+      )}
+
+      {preview && preview.rows.length === 0 && (
+        <p className="rounded-md bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+          Every contact in that file is already unsubscribed — nothing to
+          import.
+        </p>
+      )}
+
       <button
         type="submit"
-        disabled={!file || !preview || isPending}
+        disabled={!file || !preview || preview.rows.length === 0 || isPending}
         className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isPending
