@@ -6,6 +6,7 @@ import {
   getBulkFileResult,
   type SimplifiedStatus,
 } from "@/lib/zerobounce";
+import { getCurrentMembership } from "@/lib/organizations";
 
 const BULK_THRESHOLD = 50;
 
@@ -23,6 +24,8 @@ export type StartVerificationResult =
 
 const QUOTA_EXCEEDED_MESSAGE =
   "You've used your monthly validation limit. Contact your admin to increase it.";
+const NOT_ACTIVE_MESSAGE =
+  "Your organization membership isn't active yet. Contact your admin.";
 
 async function applyResults(
   supabase: SupabaseClient,
@@ -63,6 +66,15 @@ export async function startVerification(
   }
 
   const emails = pending.map((c) => c.email as string);
+
+  // try_consume_quota() only matches memberships with status = 'active' and
+  // returns a plain false either way, so check membership state ourselves
+  // first to give a message that actually points at the real problem
+  // instead of always blaming "quota exceeded".
+  const membership = await getCurrentMembership(supabase);
+  if (!membership || membership.status !== "active") {
+    return { mode: "quota_exceeded", message: NOT_ACTIVE_MESSAGE };
+  }
 
   const { data: quotaOk, error: quotaError } = await supabase.rpc("try_consume_quota", {
     p_kind: "validation",
