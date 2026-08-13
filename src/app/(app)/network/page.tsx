@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
+import { companyDisplayName } from "@/lib/companyName";
 
 interface DomainCount {
   domain: string;
@@ -50,7 +51,10 @@ export default async function NetworkPage() {
             >
               <div className="mb-3 flex items-start justify-between gap-4">
                 <div>
-                  <h3 className="font-medium text-gray-900">{d.domain}</h3>
+                  <h3 className="font-medium text-gray-900">
+                    {companyDisplayName(d.domain)}
+                  </h3>
+                  <p className="text-xs text-gray-400">{d.domain}</p>
                   {d.pending > 0 && (
                     <p className="mt-0.5 text-xs font-medium text-yellow-700">
                       ⚠ Needs attention — {d.pending} pending verification

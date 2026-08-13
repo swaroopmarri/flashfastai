@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { AudienceToggle } from "./AudienceToggle";
+import { companyDisplayName } from "@/lib/companyName";
 
 export default async function AudiencePage({
   params,
@@ -48,7 +49,9 @@ export default async function AudiencePage({
     ? `/contacts/${campaign.contact_list_id}`
     : `/network/${campaign.company_domain}`;
   const audienceLabel = campaign.contact_list_id ? "List" : "Company";
-  const audienceName = campaign.contact_list_id ? listName : campaign.company_domain;
+  const audienceName = campaign.contact_list_id
+    ? listName
+    : companyDisplayName(campaign.company_domain as string);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
@@ -61,6 +64,9 @@ export default async function AudiencePage({
           <Link href={audienceHref} className="text-indigo-600 hover:underline">
             {audienceName}
           </Link>
+          {!campaign.contact_list_id && (
+            <span className="text-xs text-gray-400"> ({campaign.company_domain})</span>
+          )}
         </p>
 
         <div className="mb-4 flex gap-4 text-sm">

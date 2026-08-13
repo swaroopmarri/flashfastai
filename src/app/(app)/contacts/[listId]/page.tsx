@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { UploadForm } from "../UploadForm";
 import { VerifyPanel } from "../../_components/VerifyPanel";
+import { companyDisplayName } from "@/lib/companyName";
 
 const STATUS_STYLES: Record<string, string> = {
   pending_verification: "bg-gray-100 text-gray-700",
@@ -33,7 +34,9 @@ function groupKey(c: ContactRow): string {
 
 function groupLabel(c: ContactRow): string {
   const company = c.company?.trim();
-  return company ? `Company: ${company}` : `Domain: ${emailDomain(c.email)}`;
+  if (company) return `Company: ${company}`;
+  const domain = emailDomain(c.email);
+  return `${companyDisplayName(domain)} (${domain})`;
 }
 
 function sortAndGroupContacts(contacts: ContactRow[]): {

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { getCurrentMembership } from "@/lib/organizations";
 import { startCampaignSend, type StartSendResult } from "@/lib/campaignSend";
+import { companyDisplayName } from "@/lib/companyName";
 
 export async function createCampaign(name: string, contactListId: string) {
   const supabase = createClient();
@@ -48,7 +49,7 @@ export async function createCompanyCampaign(domain: string) {
     .from("campaigns")
     .insert({
       user_id: user.id,
-      name: `${domain} campaign`,
+      name: `${companyDisplayName(domain)} campaign`,
       company_domain: domain,
       organization_id: membership?.organization_id ?? null,
     })

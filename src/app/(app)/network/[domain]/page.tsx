@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { VerifyPanel } from "../../_components/VerifyPanel";
 import { createCompanyCampaign } from "../../campaigns/actions";
+import { companyDisplayName } from "@/lib/companyName";
 
 const STATUS_STYLES: Record<string, string> = {
   pending_verification: "bg-gray-100 text-gray-700",
@@ -54,7 +55,12 @@ export default async function NetworkDomainPage({
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">{domain}</h1>
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            {companyDisplayName(domain)}
+          </h1>
+          <p className="text-sm text-gray-400">{domain}</p>
+        </div>
         <Link href="/network" className="text-sm text-indigo-600 hover:underline">
           Back to My Network
         </Link>
