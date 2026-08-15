@@ -12,8 +12,7 @@ const BULK_THRESHOLD = 50;
 
 export type VerificationScope =
   | { type: "list"; contactListId: string }
-  | { type: "company"; domain: string }
-  | { type: "selection"; emails: string[] };
+  | { type: "company"; domain: string };
 
 export interface VerificationSummary {
   deliverable: number;
@@ -73,23 +72,17 @@ async function fetchPendingEmails(
 ): Promise<string[]> {
   let query = supabase.from("contacts").select("email").eq("status", "pending_verification");
 
-  if (scope.type === "list") {
-    query = query.eq("contact_list_id", scope.contactListId);
-  } else if (scope.type === "company") {
-    query = query.ilike("email", `%@${scope.domain}`);
-  } else {
-    query = query.in(
-      "email",
-      scope.emails.map((e) => e.trim().toLowerCase()),
-    );
-  }
+  query =
+    scope.type === "list"
+      ? query.eq("contact_list_id", scope.contactListId)
+      : query.ilike("email", `%@${scope.domain}`);
 
   const { data, error } = await query;
   if (error) throw error;
 
-  // Company/selection scopes can return the same email more than once
-  // (present in multiple lists) -- dedupe so we don't pay quota or call
-  // ZeroBounce twice for one address.
+  // Company scope can return the same email more than once (present in
+  // multiple lists) -- dedupe so we don't pay quota or call ZeroBounce
+  // twice for one address.
   return Array.from(
     new Set((data ?? []).map((c) => (c.email as string).trim().toLowerCase())),
   );
@@ -129,13 +122,8 @@ async function startVerificationForScope(
 
   const jobBase =
     scope.type === "list"
-      ? { contact_list_id: scope.contactListId, company_domain: null, selected_emails: null }
-      : scope.type === "company"
-        ? { contact_list_id: null, company_domain: scope.domain, selected_emails: null }
-        // Stores the emails actually being verified (the pending subset of
-        // the original selection), not the raw selection -- that's what a
-        // resumed bulk job needs to know which contacts to apply results to.
-        : { contact_list_id: null, company_domain: null, selected_emails: emails };
+      ? { contact_list_id: scope.contactListId, company_domain: null }
+      : { contact_list_id: null, company_domain: scope.domain };
 
   if (emails.length <= BULK_THRESHOLD) {
     const results = await validateBatch(emails);
@@ -185,13 +173,6 @@ export async function startCompanyVerification(
   domain: string,
 ): Promise<StartVerificationResult> {
   return startVerificationForScope(supabase, { type: "company", domain });
-}
-
-export async function startSelectionVerification(
-  supabase: SupabaseClient,
-  emails: string[],
-): Promise<StartVerificationResult> {
-  return startVerificationForScope(supabase, { type: "selection", emails });
 }
 
 export interface JobPollResult {
@@ -253,9 +234,7 @@ export async function pollVerificationJob(
   // zbStatus === "Complete"
   const scope: VerificationScope = job.contact_list_id
     ? { type: "list", contactListId: job.contact_list_id }
-    : job.company_domain
-      ? { type: "company", domain: job.company_domain }
-      : { type: "selection", emails: job.selected_emails ?? [] };
+    : { type: "company", domain: job.company_domain };
   const results = await getBulkFileResult(job.zerobounce_file_id);
   const summary = await applyResults(supabase, scope, results);
 

@@ -17,17 +17,11 @@ export default async function AudiencePage({
 
   const { data: campaign } = await supabase
     .from("campaigns")
-    .select(
-      "id, name, include_risky, contact_list_id, company_domain, selected_contact_emails, contact_lists(name)",
-    )
+    .select("id, name, include_risky, contact_list_id, company_domain, contact_lists(name)")
     .eq("id", params.id)
     .maybeSingle();
 
-  if (
-    !campaign ||
-    (!campaign.contact_list_id && !campaign.company_domain && !campaign.selected_contact_emails?.length)
-  )
-    notFound();
+  if (!campaign || (!campaign.contact_list_id && !campaign.company_domain)) notFound();
 
   const counts = { deliverable: 0, risky: 0, undeliverable: 0, pending_verification: 0 };
 
@@ -40,19 +34,9 @@ export default async function AudiencePage({
     for (const c of contacts ?? []) {
       if (c.status in counts) counts[c.status as keyof typeof counts]++;
     }
-  } else if (campaign.company_domain) {
+  } else {
     const { data: contacts, error } = await supabase.rpc("get_network_domain_contacts", {
       p_domain: campaign.company_domain,
-    });
-    if (error) throw error;
-    for (const c of contacts ?? []) {
-      if (c.status in counts) counts[c.status as keyof typeof counts]++;
-    }
-  } else {
-    const emails = campaign.selected_contact_emails as string[];
-    const { data: contacts, error } = await supabase.rpc("search_network_contacts", {
-      p_emails: emails,
-      p_limit: emails.length,
     });
     if (error) throw error;
     for (const c of contacts ?? []) {
@@ -63,19 +47,11 @@ export default async function AudiencePage({
   const listName = (campaign.contact_lists as unknown as { name: string } | null)?.name;
   const audienceHref = campaign.contact_list_id
     ? `/contacts/${campaign.contact_list_id}`
-    : campaign.company_domain
-      ? `/network/${campaign.company_domain}`
-      : "/network";
-  const audienceLabel = campaign.contact_list_id
-    ? "List"
-    : campaign.company_domain
-      ? "Company"
-      : "Selection";
+    : `/network/${campaign.company_domain}`;
+  const audienceLabel = campaign.contact_list_id ? "List" : "Company";
   const audienceName = campaign.contact_list_id
     ? listName
-    : campaign.company_domain
-      ? companyDisplayName(campaign.company_domain)
-      : `${campaign.selected_contact_emails?.length ?? 0} selected contacts`;
+    : companyDisplayName(campaign.company_domain as string);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
@@ -88,7 +64,7 @@ export default async function AudiencePage({
           <Link href={audienceHref} className="text-indigo-600 hover:underline">
             {audienceName}
           </Link>
-          {campaign.company_domain && (
+          {!campaign.contact_list_id && (
             <span className="text-xs text-gray-400"> ({campaign.company_domain})</span>
           )}
         </p>

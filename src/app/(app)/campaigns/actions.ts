@@ -62,37 +62,6 @@ export async function createCompanyCampaign(domain: string) {
   redirect(`/campaigns/${campaign.id}/audience`);
 }
 
-/** "Add to Campaign" bulk action from My Network -- creates a campaign
- * scoped to exactly the selected emails (not a whole list or domain),
- * defaulting to deliverable-only, and jumps straight to its Audience step. */
-export async function createSelectionCampaign(emails: string[]) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-  if (emails.length === 0) throw new Error("No contacts selected.");
-
-  const membership = await getCurrentMembership(supabase);
-  const normalized = emails.map((e) => e.trim().toLowerCase());
-
-  const { data: campaign, error } = await supabase
-    .from("campaigns")
-    .insert({
-      user_id: user.id,
-      name: `Selected contacts campaign (${normalized.length})`,
-      selected_contact_emails: normalized,
-      organization_id: membership?.organization_id ?? null,
-    })
-    .select("id")
-    .single();
-
-  if (error) throw error;
-
-  revalidatePath("/campaigns");
-  redirect(`/campaigns/${campaign.id}/audience`);
-}
-
 export async function updateAudience(campaignId: string, includeRisky: boolean) {
   const supabase = createClient();
   const { error } = await supabase

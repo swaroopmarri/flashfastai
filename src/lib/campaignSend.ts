@@ -28,9 +28,7 @@ export async function startCampaignSend(
 ): Promise<StartSendResult> {
   const { data: campaign, error } = await supabase
     .from("campaigns")
-    .select(
-      "id, user_id, contact_list_id, company_domain, selected_contact_emails, include_risky, subject, body, status",
-    )
+    .select("id, user_id, contact_list_id, company_domain, include_risky, subject, body, status")
     .eq("id", campaignId)
     .single();
   if (error) throw error;
@@ -41,11 +39,7 @@ export async function startCampaignSend(
   if (!campaign.subject?.trim() || !campaign.body?.trim()) {
     return { mode: "blocked", message: "Add a subject and body before sending." };
   }
-  if (
-    !campaign.contact_list_id &&
-    !campaign.company_domain &&
-    !campaign.selected_contact_emails?.length
-  ) {
+  if (!campaign.contact_list_id && !campaign.company_domain) {
     return { mode: "no_recipients" };
   }
 
@@ -53,9 +47,7 @@ export async function startCampaignSend(
   let contactsQuery = supabase.from("contacts").select("id, email").in("status", statuses);
   contactsQuery = campaign.contact_list_id
     ? contactsQuery.eq("contact_list_id", campaign.contact_list_id)
-    : campaign.company_domain
-      ? contactsQuery.ilike("email", `%@${campaign.company_domain}`)
-      : contactsQuery.in("email", campaign.selected_contact_emails as string[]);
+    : contactsQuery.ilike("email", `%@${campaign.company_domain}`);
   const { data: contacts, error: contactsError } = await contactsQuery;
   if (contactsError) throw contactsError;
 
@@ -66,11 +58,10 @@ export async function startCampaignSend(
   if (unsubError) throw unsubError;
   const unsubSet = new Set((unsubs ?? []).map((u) => u.email as string));
 
-  // A domain- or selection-scoped audience can return the same email more
-  // than once (it exists in several of the user's lists) -- dedupe so we
-  // never email the same person twice or charge quota for it twice.
-  // List-scoped audiences are already unique per the DB constraint, so
-  // this is a no-op there.
+  // A domain-scoped audience can return the same email more than once (it
+  // exists in several of the user's lists) -- dedupe so we never email the
+  // same person twice or charge quota for it twice. List-scoped audiences
+  // are already unique per the DB constraint, so this is a no-op there.
   const seen = new Set<string>();
   const recipients: { id: string; email: string }[] = [];
   for (const c of contacts ?? []) {
