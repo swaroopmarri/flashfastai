@@ -5,6 +5,7 @@ import { RecommendedActions } from "../_components/RecommendedActions";
 import { NetworkSearchFilters } from "../_components/NetworkSearchFilters";
 import { CompanyCardsGrid, type DomainCount } from "../_components/CompanyCardsGrid";
 import { ContactsTable } from "../_components/ContactsTable";
+import { isMissingSchemaError } from "@/lib/schemaGuard";
 
 interface Overview {
   total_contacts: number;
@@ -17,11 +18,13 @@ interface Overview {
   duplicate_emails: number;
 }
 
-function KpiCard({ label, value }: { label: string; value: number }) {
+function KpiCard({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
       <p className="text-xs text-gray-500">{label}</p>
-      <p className="mt-0.5 text-xl font-semibold text-gray-900">{value.toLocaleString()}</p>
+      <p className="mt-0.5 text-xl font-semibold text-gray-900">
+        {value === null ? "N/A" : value.toLocaleString()}
+      </p>
     </div>
   );
 }
@@ -37,10 +40,13 @@ export default async function NetworkPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  // get_network_overview() is added by migration 0008 -- if that hasn't
+  // been run yet, degrade to "N/A" cards instead of crashing the page.
   const { data: overviewData, error: overviewError } = await supabase.rpc(
     "get_network_overview",
   );
-  if (overviewError) throw overviewError;
+  if (overviewError && !isMissingSchemaError(overviewError)) throw overviewError;
+  const migrationPending = Boolean(overviewError && isMissingSchemaError(overviewError));
   const overview = (overviewData?.[0] ?? {
     total_contacts: 0,
     companies: 0,
@@ -58,11 +64,11 @@ export default async function NetworkPage({
   const isFiltering = Boolean(search || status || duplicatesOnly);
 
   let companies: DomainCount[] = [];
-  if (!isFiltering && overview.total_contacts > 0) {
+  if (!migrationPending && !isFiltering && overview.total_contacts > 0) {
     const { data: domainData, error: domainError } = await supabase.rpc(
       "get_network_domain_counts",
     );
-    if (domainError) throw domainError;
+    if (domainError && !isMissingSchemaError(domainError)) throw domainError;
     companies = (domainData ?? []) as DomainCount[];
   }
 
@@ -73,7 +79,17 @@ export default async function NetworkPage({
         Manage, understand, and improve the health of your contact database.
       </p>
 
-      {overview.total_contacts === 0 ? (
+      {migrationPending ? (
+        <div className="rounded-lg border border-dashed border-yellow-300 bg-yellow-50 px-6 py-10 text-center">
+          <p className="text-sm font-medium text-yellow-900">
+            My Network needs a database migration that hasn&apos;t been run yet.
+          </p>
+          <p className="mt-1 text-sm text-yellow-800">
+            Run <code className="rounded bg-yellow-100 px-1 py-0.5">0008_network_health.sql</code>{" "}
+            in the Supabase SQL Editor, then reload this page.
+          </p>
+        </div>
+      ) : overview.total_contacts === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 px-6 py-16 text-center">
           <p className="text-sm font-medium text-gray-900">No contacts yet</p>
           <p className="mt-1 text-sm text-gray-500">
