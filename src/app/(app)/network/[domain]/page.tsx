@@ -2,23 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { VerifyPanel } from "../../_components/VerifyPanel";
+import { ContactsTable } from "../../_components/ContactsTable";
 import { createCompanyCampaign } from "../../campaigns/actions";
 import { companyDisplayName } from "@/lib/companyName";
 
-const STATUS_STYLES: Record<string, string> = {
-  pending_verification: "bg-gray-100 text-gray-700",
-  deliverable: "bg-green-100 text-green-700",
-  risky: "bg-yellow-100 text-yellow-700",
-  undeliverable: "bg-red-100 text-red-700",
-  unsubscribed: "bg-gray-200 text-gray-500",
-};
-
-interface DomainContact {
-  email: string;
-  name: string | null;
-  company: string | null;
-  status: string;
-  list_names: string[];
+interface DomainCount {
+  domain: string;
+  total: number;
+  deliverable: number;
+  risky: number;
+  undeliverable: number;
+  pending: number;
+  unsubscribed: number;
 }
 
 export default async function NetworkDomainPage({
@@ -33,13 +28,13 @@ export default async function NetworkDomainPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data, error } = await supabase.rpc("get_network_domain_contacts", {
-    p_domain: domain,
-  });
-  if (error) throw error;
-
-  const contacts = (data ?? []) as DomainContact[];
-  const pendingCount = contacts.filter((c) => c.status === "pending_verification").length;
+  // Reuses the same per-company aggregate the overview page's cards are
+  // built from, rather than loading every contact just to count them.
+  const { data: domainCounts, error: countsError } = await supabase.rpc(
+    "get_network_domain_counts",
+  );
+  if (countsError) throw countsError;
+  const summary = ((domainCounts ?? []) as DomainCount[]).find((d) => d.domain === domain);
 
   const { data: activeJob } = await supabase
     .from("verification_jobs")
@@ -66,10 +61,31 @@ export default async function NetworkDomainPage({
         </Link>
       </div>
 
+      {summary && (
+        <div className="mb-8 flex flex-wrap gap-2 text-sm">
+          <span className="rounded-full bg-gray-100 px-3 py-1 font-medium text-gray-700">
+            {summary.total.toLocaleString()} contacts
+          </span>
+          <span className="rounded-full bg-green-100 px-3 py-1 font-medium text-green-700">
+            {summary.deliverable} deliverable
+          </span>
+          {summary.risky > 0 && (
+            <span className="rounded-full bg-yellow-100 px-3 py-1 font-medium text-yellow-700">
+              {summary.risky} risky
+            </span>
+          )}
+          {summary.undeliverable > 0 && (
+            <span className="rounded-full bg-red-100 px-3 py-1 font-medium text-red-700">
+              {summary.undeliverable} undeliverable
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <VerifyPanel
           target={{ type: "company", domain }}
-          pendingCount={pendingCount}
+          pendingCount={summary?.pending ?? 0}
           activeJobId={activeJob?.id ?? null}
           label="Verify all unverified"
           buttonLabel="Verify all unverified"
@@ -92,48 +108,8 @@ export default async function NetworkDomainPage({
         </form>
       </div>
 
-      <h2 className="mb-3 text-lg font-medium text-gray-900">
-        Contacts ({contacts.length})
-      </h2>
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead>
-            <tr className="text-left text-gray-500">
-              <th className="px-4 py-2 font-medium">Email</th>
-              <th className="px-4 py-2 font-medium">Name</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 font-medium">Lists</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {contacts.map((c) => (
-              <tr key={c.email}>
-                <td className="px-4 py-2 text-gray-900">{c.email}</td>
-                <td className="px-4 py-2 text-gray-600">{c.name || "—"}</td>
-                <td className="px-4 py-2">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[c.status] ?? "bg-gray-100 text-gray-700"}`}
-                  >
-                    {c.status.replace("_", " ")}
-                  </span>
-                </td>
-                <td className="px-4 py-2">
-                  <div className="flex flex-wrap gap-1">
-                    {c.list_names.map((name) => (
-                      <span
-                        key={name}
-                        className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600"
-                      >
-                        {name}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <h2 className="mb-3 text-lg font-medium text-gray-900">Contacts</h2>
+      <ContactsTable domain={domain} pageSize={25} />
     </div>
   );
 }

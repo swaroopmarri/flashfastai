@@ -18,18 +18,24 @@ export default async function ComposePage({
   const { data: campaign } = await supabase
     .from("campaigns")
     .select(
-      "id, name, subject, body, reply_to, status, contact_list_id, company_domain, include_risky, user_id",
+      "id, name, subject, body, reply_to, status, contact_list_id, company_domain, selected_contact_emails, include_risky, user_id",
     )
     .eq("id", params.id)
     .maybeSingle();
 
-  if (!campaign || (!campaign.contact_list_id && !campaign.company_domain)) notFound();
+  if (
+    !campaign ||
+    (!campaign.contact_list_id && !campaign.company_domain && !campaign.selected_contact_emails?.length)
+  )
+    notFound();
 
   const statuses = campaign.include_risky ? ["deliverable", "risky"] : ["deliverable"];
   let eligibleQuery = supabase.from("contacts").select("email").in("status", statuses);
   eligibleQuery = campaign.contact_list_id
     ? eligibleQuery.eq("contact_list_id", campaign.contact_list_id)
-    : eligibleQuery.ilike("email", `%@${campaign.company_domain}`);
+    : campaign.company_domain
+      ? eligibleQuery.ilike("email", `%@${campaign.company_domain}`)
+      : eligibleQuery.in("email", campaign.selected_contact_emails as string[]);
   const { data: eligibleContacts, error: contactsError } = await eligibleQuery;
   if (contactsError) throw contactsError;
 

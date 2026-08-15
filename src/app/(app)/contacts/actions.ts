@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/server";
 import {
   startVerification as startVerificationLib,
   startCompanyVerification as startCompanyVerificationLib,
+  startSelectionVerification as startSelectionVerificationLib,
   type StartVerificationResult,
 } from "@/lib/verification";
 import { getCurrentMembership } from "@/lib/organizations";
@@ -159,6 +160,35 @@ export async function startCompanyVerificationAction(
   const supabase = createClient();
   const result = await startCompanyVerificationLib(supabase, domain);
   revalidatePath(`/network/${domain}`);
+  return result;
+}
+
+export async function startSelectionVerificationAction(
+  emails: string[],
+): Promise<StartVerificationResult> {
+  const supabase = createClient();
+  const result = await startSelectionVerificationLib(supabase, emails);
+  revalidatePath("/network");
+  return result;
+}
+
+/** "Verify Now" on the My Network Recommended Actions card -- verifies
+ * every pending contact across every list the user owns, in one go.
+ * Reuses the "selection" scope with the full set of pending emails
+ * fetched up front, rather than adding a fourth verification scope. */
+export async function startNetworkVerificationAction(): Promise<StartVerificationResult> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("email")
+    .eq("status", "pending_verification");
+  if (error) throw error;
+
+  const emails = Array.from(
+    new Set((data ?? []).map((c) => (c.email as string).trim().toLowerCase())),
+  );
+  const result = await startSelectionVerificationLib(supabase, emails);
+  revalidatePath("/network");
   return result;
 }
 
