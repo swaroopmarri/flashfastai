@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
 import { sendCampaignEmail } from "@/lib/ses";
 import { getCurrentMembership } from "@/lib/organizations";
-import { isMissingSchemaError } from "@/lib/schemaGuard";
 
 const BATCH_SIZE = 10;
 
@@ -27,30 +26,14 @@ export async function startCampaignSend(
   supabase: SupabaseClient,
   campaignId: string,
 ): Promise<StartSendResult> {
-  let { data: campaign, error } = await supabase
+  const { data: campaign, error } = await supabase
     .from("campaigns")
     .select(
       "id, user_id, contact_list_id, company_domain, selected_contact_emails, include_risky, subject, body, status",
     )
     .eq("id", campaignId)
     .single();
-
-  // selected_contact_emails is added by migration 0008 -- if it hasn't run
-  // yet, fall back to the pre-0008 select so existing list/domain-scoped
-  // campaigns can still send.
-  if (error && isMissingSchemaError(error)) {
-    const fallback = await supabase
-      .from("campaigns")
-      .select(
-        "id, user_id, contact_list_id, company_domain, include_risky, subject, body, status",
-      )
-      .eq("id", campaignId)
-      .single();
-    campaign = fallback.data ? { ...fallback.data, selected_contact_emails: null } : null;
-    error = fallback.error;
-  }
   if (error) throw error;
-  if (!campaign) throw new Error("Campaign not found.");
 
   if (campaign.status !== "draft") {
     return { mode: "blocked", message: `This campaign is already ${campaign.status}.` };

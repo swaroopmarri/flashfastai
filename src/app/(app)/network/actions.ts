@@ -1,7 +1,6 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
-import { isMissingSchemaError } from "@/lib/schemaGuard";
 
 export interface NetworkContactRow {
   email: string;
@@ -58,13 +57,7 @@ export async function searchNetworkContactsAction(params: {
     p_limit: params.pageSize,
     p_offset: (params.page - 1) * params.pageSize,
   });
-  if (error) {
-    // search_network_contacts is added by migration 0008 -- if it hasn't
-    // been run yet, degrade to an empty result (the table already renders
-    // "No contacts match your filters" for that) instead of throwing.
-    if (isMissingSchemaError(error)) return { rows: [], totalCount: 0 };
-    throw error;
-  }
+  if (error) throw error;
 
   const rawRows = (data ?? []) as RawSearchRow[];
   const rows: NetworkContactRow[] = rawRows.map((r) => ({

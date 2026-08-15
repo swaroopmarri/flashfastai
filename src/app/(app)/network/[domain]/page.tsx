@@ -5,7 +5,6 @@ import { VerifyPanel } from "../../_components/VerifyPanel";
 import { ContactsTable } from "../../_components/ContactsTable";
 import { createCompanyCampaign } from "../../campaigns/actions";
 import { companyDisplayName } from "@/lib/companyName";
-import { isMissingSchemaError } from "@/lib/schemaGuard";
 
 interface DomainCount {
   domain: string;
@@ -34,7 +33,7 @@ export default async function NetworkDomainPage({
   const { data: domainCounts, error: countsError } = await supabase.rpc(
     "get_network_domain_counts",
   );
-  if (countsError && !isMissingSchemaError(countsError)) throw countsError;
+  if (countsError) throw countsError;
   const summary = ((domainCounts ?? []) as DomainCount[]).find((d) => d.domain === domain);
 
   const { data: activeJob } = await supabase

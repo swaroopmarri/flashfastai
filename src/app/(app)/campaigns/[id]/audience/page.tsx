@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { AudienceToggle } from "./AudienceToggle";
 import { companyDisplayName } from "@/lib/companyName";
-import { isMissingSchemaError } from "@/lib/schemaGuard";
 
 export default async function AudiencePage({
   params,
@@ -16,27 +15,13 @@ export default async function AudiencePage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  let { data: campaign, error: campaignError } = await supabase
+  const { data: campaign } = await supabase
     .from("campaigns")
     .select(
       "id, name, include_risky, contact_list_id, company_domain, selected_contact_emails, contact_lists(name)",
     )
     .eq("id", params.id)
     .maybeSingle();
-
-  // selected_contact_emails is added by migration 0008 -- if it hasn't run
-  // yet, fall back to the pre-0008 select so existing list/domain-scoped
-  // campaigns still work rather than 404ing on an unrelated column.
-  if (campaignError && isMissingSchemaError(campaignError)) {
-    const fallback = await supabase
-      .from("campaigns")
-      .select("id, name, include_risky, contact_list_id, company_domain, contact_lists(name)")
-      .eq("id", params.id)
-      .maybeSingle();
-    campaign = fallback.data ? { ...fallback.data, selected_contact_emails: null } : null;
-    campaignError = fallback.error;
-  }
-  if (campaignError && !isMissingSchemaError(campaignError)) throw campaignError;
 
   if (
     !campaign ||
