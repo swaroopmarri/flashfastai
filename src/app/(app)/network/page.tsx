@@ -11,6 +11,20 @@ interface DomainCount {
   undeliverable: number;
   pending: number;
   unsubscribed: number;
+  last_verified_at?: string | null;
+}
+
+function formatLastVerified(iso: string | null | undefined): string {
+  if (!iso) return "Never";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 30) return `${days} days ago`;
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default async function NetworkPage() {
@@ -54,6 +68,7 @@ export default async function NetworkPage() {
                 <th className="px-3 py-2 text-right font-medium">Risky</th>
                 <th className="px-3 py-2 text-right font-medium">Pending</th>
                 <th className="px-3 py-2 text-right font-medium">Unsubscribed</th>
+                <th className="px-3 py-2 font-medium">Last Verified</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -97,7 +112,21 @@ export default async function NetworkPage() {
                     <td className="px-3 py-1.5 text-right text-gray-400">
                       {d.unsubscribed || "—"}
                     </td>
-                    <td className="px-3 py-1.5 text-right">
+                    <td
+                      className="whitespace-nowrap px-3 py-1.5 text-gray-500"
+                      title={d.last_verified_at ? new Date(d.last_verified_at).toLocaleString() : undefined}
+                    >
+                      {formatLastVerified(d.last_verified_at)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-1.5 text-right">
+                      <Link
+                        href={`/network/${d.domain}`}
+                        className="text-xs font-medium text-indigo-600 hover:underline"
+                        title="Verify this company's pending contacts"
+                      >
+                        Verify
+                      </Link>
+                      <span className="mx-1.5 text-gray-300">·</span>
                       <a
                         href={`/api/network/${d.domain}/export`}
                         className="text-xs font-medium text-indigo-600 hover:underline"
