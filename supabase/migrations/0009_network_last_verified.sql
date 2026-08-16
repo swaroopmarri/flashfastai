@@ -5,6 +5,10 @@
 -- Run this in the Supabase dashboard: SQL Editor -> New query -> paste -> Run.
 -- Run AFTER 0001-0008.
 
+-- Postgres can't change a function's return columns via CREATE OR REPLACE
+-- -- only its body -- so the old signature has to be dropped first.
+drop function if exists public.get_network_domain_counts();
+
 create or replace function public.get_network_domain_counts()
 returns table (
   domain text,
