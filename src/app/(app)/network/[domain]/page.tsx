@@ -40,6 +40,7 @@ export default async function NetworkDomainPage({
 
   const contacts = (data ?? []) as DomainContact[];
   const pendingCount = contacts.filter((c) => c.status === "pending_verification").length;
+  const verifiedCount = contacts.length - pendingCount;
 
   const { data: activeJob } = await supabase
     .from("verification_jobs")
@@ -92,9 +93,20 @@ export default async function NetworkDomainPage({
         </form>
       </div>
 
-      <h2 className="mb-3 text-lg font-medium text-gray-900">
-        Contacts ({contacts.length})
-      </h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-medium text-gray-900">
+          Contacts ({contacts.length})
+          <span className="ml-2 text-sm font-normal text-gray-500">
+            {verifiedCount} of {contacts.length} verified
+          </span>
+        </h2>
+        <a
+          href={`/api/network/${domain}/export`}
+          className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Download CSV
+        </a>
+      </div>
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead>

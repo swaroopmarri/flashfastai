@@ -48,47 +48,67 @@ export default async function NetworkPage() {
               <tr className="text-left text-gray-500">
                 <th className="px-3 py-2 font-medium">Company</th>
                 <th className="px-3 py-2 text-right font-medium">Total</th>
+                <th className="px-3 py-2 text-right font-medium">Verified</th>
                 <th className="px-3 py-2 text-right font-medium">Deliverable</th>
                 <th className="px-3 py-2 text-right font-medium">Undeliverable</th>
                 <th className="px-3 py-2 text-right font-medium">Risky</th>
                 <th className="px-3 py-2 text-right font-medium">Pending</th>
                 <th className="px-3 py-2 text-right font-medium">Unsubscribed</th>
+                <th className="px-3 py-2" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {domains.map((d) => (
-                <tr key={d.domain} className="hover:bg-gray-50">
-                  <td className="whitespace-nowrap px-3 py-1.5">
-                    <Link
-                      href={`/network/${d.domain}`}
-                      className="font-medium text-indigo-600 hover:underline"
-                    >
-                      {companyDisplayName(d.domain)}
-                    </Link>
-                    <span className="ml-1.5 text-xs text-gray-400">{d.domain}</span>
-                    {d.pending > 0 && (
-                      <span
-                        className="ml-1.5 text-xs font-medium text-yellow-700"
-                        title={`${d.pending} pending verification`}
+              {domains.map((d) => {
+                const verified = d.total - d.pending;
+                return (
+                  <tr key={d.domain} className="hover:bg-gray-50">
+                    <td className="whitespace-nowrap px-3 py-1.5">
+                      <Link
+                        href={`/network/${d.domain}`}
+                        className="font-medium text-indigo-600 hover:underline"
                       >
-                        ⚠
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-1.5 text-right text-gray-700">{d.total}</td>
-                  <td className="px-3 py-1.5 text-right text-green-700">
-                    {d.deliverable || "—"}
-                  </td>
-                  <td className="px-3 py-1.5 text-right text-red-700">
-                    {d.undeliverable || "—"}
-                  </td>
-                  <td className="px-3 py-1.5 text-right text-yellow-700">{d.risky || "—"}</td>
-                  <td className="px-3 py-1.5 text-right text-gray-600">{d.pending || "—"}</td>
-                  <td className="px-3 py-1.5 text-right text-gray-400">
-                    {d.unsubscribed || "—"}
-                  </td>
-                </tr>
-              ))}
+                        {companyDisplayName(d.domain)}
+                      </Link>
+                      <span className="ml-1.5 text-xs text-gray-400">{d.domain}</span>
+                      {d.pending > 0 && (
+                        <span
+                          className="ml-1.5 text-xs font-medium text-yellow-700"
+                          title={`${d.pending} pending verification`}
+                        >
+                          ⚠
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-gray-700">{d.total}</td>
+                    <td
+                      className="px-3 py-1.5 text-right text-gray-700"
+                      title={`${verified} of ${d.total} contacts have been verified`}
+                    >
+                      {verified}/{d.total}
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-green-700">
+                      {d.deliverable || "—"}
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-red-700">
+                      {d.undeliverable || "—"}
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-yellow-700">{d.risky || "—"}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-600">{d.pending || "—"}</td>
+                    <td className="px-3 py-1.5 text-right text-gray-400">
+                      {d.unsubscribed || "—"}
+                    </td>
+                    <td className="px-3 py-1.5 text-right">
+                      <a
+                        href={`/api/network/${d.domain}/export`}
+                        className="text-xs font-medium text-indigo-600 hover:underline"
+                        title="Download this company's contacts as CSV"
+                      >
+                        Download
+                      </a>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
