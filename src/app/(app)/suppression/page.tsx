@@ -38,6 +38,17 @@ function formatDate(iso: string): string {
   });
 }
 
+function DownloadLink({ type }: { type: "complaints" | "unsubscribed" | "bounced" }) {
+  return (
+    <a
+      href={`/api/suppression/export?type=${type}`}
+      className="text-xs font-medium text-indigo-600 hover:underline"
+    >
+      Download CSV
+    </a>
+  );
+}
+
 export default async function SuppressionPage() {
   const supabase = createClient();
   const {
@@ -65,7 +76,7 @@ export default async function SuppressionPage() {
   const totalBounced = Array.from(bounceGroups.values()).reduce((n, rows) => n + rows.length, 0);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="mb-2 text-2xl font-semibold text-gray-900">Suppression List</h1>
       <p className="mb-8 text-sm text-gray-500">
         Every email address that will never be sent a campaign, and why —
@@ -74,30 +85,37 @@ export default async function SuppressionPage() {
       </p>
 
       {/* Spam complaints -- highest risk, shown first */}
-      <section className="mb-8">
-        <h2 className="mb-1 flex items-center gap-2 text-lg font-medium text-gray-900">
-          <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
-          Spam complaints
-          <span className="text-sm font-normal text-gray-400">({complaints.length})</span>
-        </h2>
-        <p className="mb-3 text-xs text-gray-500">
-          Highest-risk suppressions — this recipient marked a campaign as
-          spam via their mail provider.
-        </p>
+      <section className="mb-6">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <span className="h-2 w-2 rounded-full bg-orange-500" />
+            Spam complaints
+            <span className="font-normal text-gray-400">({complaints.length})</span>
+          </h2>
+          {complaints.length > 0 && <DownloadLink type="complaints" />}
+        </div>
         {complaints.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-400">
+          <p className="rounded-lg border border-dashed border-gray-200 px-4 py-4 text-center text-sm text-gray-400">
             No spam complaints reported.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-orange-200 bg-orange-50">
-            <table className="min-w-full divide-y divide-orange-200 text-sm">
-              <tbody className="divide-y divide-orange-100">
+          <div className="overflow-x-auto rounded-lg border border-orange-200 bg-white shadow-sm">
+            <table className="min-w-full divide-y divide-orange-100 text-sm">
+              <thead>
+                <tr className="bg-orange-50 text-left text-gray-500">
+                  <th className="px-3 py-1.5 font-medium">Email</th>
+                  <th className="px-3 py-1.5 font-medium">Complained</th>
+                  <th className="px-3 py-1.5 font-medium">Campaign</th>
+                  <th className="px-3 py-1.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
                 {complaints.map((r) => (
-                  <tr key={r.email}>
-                    <td className="px-4 py-2 font-medium text-gray-900">{r.email}</td>
-                    <td className="px-4 py-2 text-gray-600">{formatDate(r.unsubscribed_at)}</td>
-                    <td className="px-4 py-2 text-gray-600">{r.campaigns?.name ?? "—"}</td>
-                    <td className="px-4 py-2 text-right">
+                  <tr key={r.email} className="hover:bg-gray-50">
+                    <td className="px-3 py-1.5 text-gray-900">{r.email}</td>
+                    <td className="px-3 py-1.5 text-gray-600">{formatDate(r.unsubscribed_at)}</td>
+                    <td className="px-3 py-1.5 text-gray-600">{r.campaigns?.name ?? "—"}</td>
+                    <td className="px-3 py-1.5 text-right">
                       <ResubscribeButton email={r.email} unsubscribedAt={r.unsubscribed_at} />
                     </td>
                   </tr>
@@ -109,37 +127,37 @@ export default async function SuppressionPage() {
       </section>
 
       {/* Unsubscribed */}
-      <section className="mb-8">
-        <h2 className="mb-1 flex items-center gap-2 text-lg font-medium text-gray-900">
-          <span className="h-2.5 w-2.5 rounded-full bg-gray-400" />
-          Unsubscribed
-          <span className="text-sm font-normal text-gray-400">({unsubscribed.length})</span>
-        </h2>
-        <p className="mb-3 text-xs text-gray-500">
-          Clicked the unsubscribe link in a campaign email.
-        </p>
+      <section className="mb-6">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <span className="h-2 w-2 rounded-full bg-gray-400" />
+            Unsubscribed
+            <span className="font-normal text-gray-400">({unsubscribed.length})</span>
+          </h2>
+          {unsubscribed.length > 0 && <DownloadLink type="unsubscribed" />}
+        </div>
         {unsubscribed.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-400">
+          <p className="rounded-lg border border-dashed border-gray-200 px-4 py-4 text-center text-sm text-gray-400">
             No unsubscribes yet.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead>
                 <tr className="text-left text-gray-500">
-                  <th className="px-4 py-2 font-medium">Email</th>
-                  <th className="px-4 py-2 font-medium">Unsubscribed</th>
-                  <th className="px-4 py-2 font-medium">From campaign</th>
-                  <th className="px-4 py-2" />
+                  <th className="px-3 py-1.5 font-medium">Email</th>
+                  <th className="px-3 py-1.5 font-medium">Unsubscribed</th>
+                  <th className="px-3 py-1.5 font-medium">From campaign</th>
+                  <th className="px-3 py-1.5" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {unsubscribed.map((r) => (
-                  <tr key={r.email}>
-                    <td className="px-4 py-2 text-gray-900">{r.email}</td>
-                    <td className="px-4 py-2 text-gray-600">{formatDate(r.unsubscribed_at)}</td>
-                    <td className="px-4 py-2 text-gray-600">{r.campaigns?.name ?? "—"}</td>
-                    <td className="px-4 py-2 text-right">
+                  <tr key={r.email} className="hover:bg-gray-50">
+                    <td className="px-3 py-1.5 text-gray-900">{r.email}</td>
+                    <td className="px-3 py-1.5 text-gray-600">{formatDate(r.unsubscribed_at)}</td>
+                    <td className="px-3 py-1.5 text-gray-600">{r.campaigns?.name ?? "—"}</td>
+                    <td className="px-3 py-1.5 text-right">
                       <ResubscribeButton email={r.email} unsubscribedAt={r.unsubscribed_at} />
                     </td>
                   </tr>
@@ -152,41 +170,38 @@ export default async function SuppressionPage() {
 
       {/* Bounced / undeliverable */}
       <section>
-        <h2 className="mb-1 flex items-center gap-2 text-lg font-medium text-gray-900">
-          <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-          Bounced / undeliverable
-          <span className="text-sm font-normal text-gray-400">({totalBounced})</span>
-        </h2>
-        <p className="mb-3 text-xs text-gray-500">
-          Failed ZeroBounce verification, or (labeled &quot;ses_...&quot;) a
-          real send bounced permanently.
-        </p>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+            <span className="h-2 w-2 rounded-full bg-red-500" />
+            Bounced / undeliverable
+            <span className="font-normal text-gray-400">({totalBounced})</span>
+          </h2>
+          {totalBounced > 0 && <DownloadLink type="bounced" />}
+        </div>
         {bounceGroups.size === 0 ? (
-          <p className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-400">
+          <p className="rounded-lg border border-dashed border-gray-200 px-4 py-4 text-center text-sm text-gray-400">
             No bounced contacts.
           </p>
         ) : (
-          <div className="space-y-4">
-            {Array.from(bounceGroups.entries()).map(([reason, rows]) => (
-              <div
-                key={reason}
-                className="overflow-hidden rounded-lg border border-red-200 bg-red-50"
-              >
-                <div className="flex items-center justify-between bg-red-100 px-4 py-2">
-                  <span className="text-sm font-medium text-red-800">
-                    {reason.replace(/_/g, " ")}
-                  </span>
-                  <span className="text-xs text-red-600">{rows.length}</span>
-                </div>
-                <ul className="divide-y divide-red-100 text-sm">
-                  {rows.map((r) => (
-                    <li key={r.email} className="px-4 py-1.5 text-gray-800">
-                      {r.email}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+          <div className="overflow-x-auto rounded-lg border border-red-200 bg-white shadow-sm">
+            <table className="min-w-full divide-y divide-red-100 text-sm">
+              <thead>
+                <tr className="bg-red-50 text-left text-gray-500">
+                  <th className="px-3 py-1.5 font-medium">Email</th>
+                  <th className="px-3 py-1.5 font-medium">Reason</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {Array.from(bounceGroups.entries()).map(([reason, rows]) =>
+                  rows.map((r) => (
+                    <tr key={r.email} className="hover:bg-gray-50">
+                      <td className="px-3 py-1.5 text-gray-900">{r.email}</td>
+                      <td className="px-3 py-1.5 text-gray-600">{reason.replace(/_/g, " ")}</td>
+                    </tr>
+                  )),
+                )}
+              </tbody>
+            </table>
           </div>
         )}
       </section>
