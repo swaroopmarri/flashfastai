@@ -26,7 +26,7 @@ export default async function NetworkPage() {
   const domains = (data ?? []) as DomainCount[];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="mb-2 text-2xl font-semibold text-gray-900">My Network</h1>
       <p className="mb-8 text-sm text-gray-500">
         Every contact across all your lists, grouped by company (email
@@ -42,57 +42,55 @@ export default async function NetworkPage() {
           to see companies here.
         </p>
       ) : (
-        <div className="space-y-4">
-          {domains.map((d) => (
-            <Link
-              key={d.domain}
-              href={`/network/${d.domain}`}
-              className="block rounded-lg border border-gray-200 bg-white p-5 shadow-sm hover:border-indigo-300"
-            >
-              <div className="mb-3 flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="font-medium text-gray-900">
-                    {companyDisplayName(d.domain)}
-                  </h3>
-                  <p className="text-xs text-gray-400">{d.domain}</p>
-                  {d.pending > 0 && (
-                    <p className="mt-0.5 text-xs font-medium text-yellow-700">
-                      ⚠ Needs attention — {d.pending} pending verification
-                    </p>
-                  )}
-                </div>
-                <p className="text-sm text-gray-500">{d.total} contacts</p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {d.deliverable > 0 && (
-                  <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
-                    {d.deliverable} deliverable
-                  </span>
-                )}
-                {d.risky > 0 && (
-                  <span className="rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-medium text-yellow-700">
-                    {d.risky} risky
-                  </span>
-                )}
-                {d.undeliverable > 0 && (
-                  <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">
-                    {d.undeliverable} undeliverable
-                  </span>
-                )}
-                {d.pending > 0 && (
-                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-                    {d.pending} pending
-                  </span>
-                )}
-                {d.unsubscribed > 0 && (
-                  <span className="rounded-full bg-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500">
-                    {d.unsubscribed} unsubscribed
-                  </span>
-                )}
-              </div>
-            </Link>
-          ))}
+        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead>
+              <tr className="text-left text-gray-500">
+                <th className="px-3 py-2 font-medium">Company</th>
+                <th className="px-3 py-2 text-right font-medium">Total</th>
+                <th className="px-3 py-2 text-right font-medium">Deliverable</th>
+                <th className="px-3 py-2 text-right font-medium">Undeliverable</th>
+                <th className="px-3 py-2 text-right font-medium">Risky</th>
+                <th className="px-3 py-2 text-right font-medium">Pending</th>
+                <th className="px-3 py-2 text-right font-medium">Unsubscribed</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {domains.map((d) => (
+                <tr key={d.domain} className="hover:bg-gray-50">
+                  <td className="whitespace-nowrap px-3 py-1.5">
+                    <Link
+                      href={`/network/${d.domain}`}
+                      className="font-medium text-indigo-600 hover:underline"
+                    >
+                      {companyDisplayName(d.domain)}
+                    </Link>
+                    <span className="ml-1.5 text-xs text-gray-400">{d.domain}</span>
+                    {d.pending > 0 && (
+                      <span
+                        className="ml-1.5 text-xs font-medium text-yellow-700"
+                        title={`${d.pending} pending verification`}
+                      >
+                        ⚠
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-1.5 text-right text-gray-700">{d.total}</td>
+                  <td className="px-3 py-1.5 text-right text-green-700">
+                    {d.deliverable || "—"}
+                  </td>
+                  <td className="px-3 py-1.5 text-right text-red-700">
+                    {d.undeliverable || "—"}
+                  </td>
+                  <td className="px-3 py-1.5 text-right text-yellow-700">{d.risky || "—"}</td>
+                  <td className="px-3 py-1.5 text-right text-gray-600">{d.pending || "—"}</td>
+                  <td className="px-3 py-1.5 text-right text-gray-400">
+                    {d.unsubscribed || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
