@@ -14,6 +14,23 @@ interface DomainCount {
   last_verified_at?: string | null;
 }
 
+const SORT_FIELDS = [
+  "company",
+  "total",
+  "verified",
+  "deliverable",
+  "undeliverable",
+  "risky",
+  "pending",
+  "unsubscribed",
+  "last_verified_at",
+] as const;
+type SortField = (typeof SORT_FIELDS)[number];
+
+function isSortField(v: string | undefined): v is SortField {
+  return !!v && (SORT_FIELDS as readonly string[]).includes(v);
+}
+
 function formatLastVerified(iso: string | null | undefined): string {
   if (!iso) return "Never";
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -27,7 +44,62 @@ function formatLastVerified(iso: string | null | undefined): string {
   });
 }
 
-export default async function NetworkPage() {
+function sortValue(d: DomainCount, field: SortField): number | string {
+  switch (field) {
+    case "company":
+      return companyDisplayName(d.domain).toLowerCase();
+    case "verified":
+      return d.total - d.pending;
+    case "last_verified_at":
+      return d.last_verified_at ? new Date(d.last_verified_at).getTime() : 0;
+    default:
+      return d[field];
+  }
+}
+
+function sortDomains(domains: DomainCount[], field: SortField, dir: "asc" | "desc"): DomainCount[] {
+  const sorted = [...domains].sort((a, b) => {
+    const av = sortValue(a, field);
+    const bv = sortValue(b, field);
+    const cmp = typeof av === "string" ? av.localeCompare(bv as string) : av - (bv as number);
+    return dir === "asc" ? cmp : -cmp;
+  });
+  return sorted;
+}
+
+function SortHeader({
+  field,
+  label,
+  align = "right",
+  activeSort,
+  activeDir,
+}: {
+  field: SortField;
+  label: string;
+  align?: "left" | "right";
+  activeSort: SortField;
+  activeDir: "asc" | "desc";
+}) {
+  const isActive = activeSort === field;
+  const nextDir = isActive && activeDir === "asc" ? "desc" : "asc";
+  return (
+    <th className={`px-3 py-2 font-medium ${align === "right" ? "text-right" : "text-left"}`}>
+      <Link
+        href={`/network?sort=${field}&dir=${nextDir}`}
+        className={`inline-flex items-center gap-0.5 hover:text-gray-900 ${isActive ? "text-gray-900" : ""}`}
+      >
+        {label}
+        {isActive && <span className="text-[10px]">{activeDir === "asc" ? "▲" : "▼"}</span>}
+      </Link>
+    </th>
+  );
+}
+
+export default async function NetworkPage({
+  searchParams,
+}: {
+  searchParams: { sort?: string; dir?: string };
+}) {
   const supabase = createClient();
   const {
     data: { user },
@@ -37,7 +109,9 @@ export default async function NetworkPage() {
   const { data, error } = await supabase.rpc("get_network_domain_counts");
   if (error) throw error;
 
-  const domains = (data ?? []) as DomainCount[];
+  const sort: SortField = isSortField(searchParams.sort) ? searchParams.sort : "total";
+  const dir: "asc" | "desc" = searchParams.dir === "asc" ? "asc" : "desc";
+  const domains = sortDomains((data ?? []) as DomainCount[], sort, dir);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -60,15 +134,21 @@ export default async function NetworkPage() {
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead>
               <tr className="text-left text-gray-500">
-                <th className="px-3 py-2 font-medium">Company</th>
-                <th className="px-3 py-2 text-right font-medium">Total</th>
-                <th className="px-3 py-2 text-right font-medium">Verified</th>
-                <th className="px-3 py-2 text-right font-medium">Deliverable</th>
-                <th className="px-3 py-2 text-right font-medium">Undeliverable</th>
-                <th className="px-3 py-2 text-right font-medium">Risky</th>
-                <th className="px-3 py-2 text-right font-medium">Pending</th>
-                <th className="px-3 py-2 text-right font-medium">Unsubscribed</th>
-                <th className="px-3 py-2 font-medium">Last Verified</th>
+                <SortHeader field="company" label="Company" align="left" activeSort={sort} activeDir={dir} />
+                <SortHeader field="total" label="Total" activeSort={sort} activeDir={dir} />
+                <SortHeader field="verified" label="Verified" activeSort={sort} activeDir={dir} />
+                <SortHeader field="deliverable" label="Deliverable" activeSort={sort} activeDir={dir} />
+                <SortHeader field="undeliverable" label="Undeliverable" activeSort={sort} activeDir={dir} />
+                <SortHeader field="risky" label="Risky" activeSort={sort} activeDir={dir} />
+                <SortHeader field="pending" label="Pending" activeSort={sort} activeDir={dir} />
+                <SortHeader field="unsubscribed" label="Unsubscribed" activeSort={sort} activeDir={dir} />
+                <SortHeader
+                  field="last_verified_at"
+                  label="Last Verified"
+                  align="left"
+                  activeSort={sort}
+                  activeDir={dir}
+                />
                 <th className="px-3 py-2" />
               </tr>
             </thead>
