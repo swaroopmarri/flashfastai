@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { getCurrentMembership, finalizeSignup } from "@/lib/organizations";
 import { logout } from "./dashboard/actions";
 import { NavLink } from "./NavLink";
+import { WhatsAppButton } from "./_components/WhatsAppButton";
 
 export default async function AppLayout({
   children,
@@ -59,6 +60,7 @@ export default async function AppLayout({
         </div>
       </header>
       <main>{children}</main>
+      <WhatsAppButton />
     </div>
   );
 }

@@ -31,12 +31,6 @@ function isSortField(v: string | undefined): v is SortField {
   return !!v && (SORT_FIELDS as readonly string[]).includes(v);
 }
 
-// One-touch WhatsApp contact link -- a single fixed number, not per-contact
-// (contacts don't store a phone number today).
-const WHATSAPP_NUMBER = "14106700167";
-const WHATSAPP_MESSAGE = "Hi, I have a question about my contacts.";
-const WHATSAPP_HREF = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
-
 function formatLastVerified(iso: string | null | undefined): string {
   if (!iso) return "Never";
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
@@ -121,17 +115,7 @@ export default async function NetworkPage({
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <div className="mb-2 flex items-start justify-between gap-4">
-        <h1 className="text-2xl font-semibold text-gray-900">My Network</h1>
-        <a
-          href={WHATSAPP_HREF}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-green-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-green-500"
-        >
-          💬 Chat on WhatsApp
-        </a>
-      </div>
+      <h1 className="mb-2 text-2xl font-semibold text-gray-900">My Network</h1>
       <p className="mb-8 text-sm text-gray-500">
         Every contact across all your lists, grouped by company (email
         domain), deduplicated by email address.
