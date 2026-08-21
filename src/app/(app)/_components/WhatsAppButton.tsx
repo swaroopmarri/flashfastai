@@ -1,8 +1,4 @@
-// One-touch WhatsApp contact link -- a single fixed number, not per-contact
-// (contacts don't store a phone number anywhere in this app).
-const WHATSAPP_NUMBER = "14106700167";
-const WHATSAPP_MESSAGE = "Hi, I have a question about my contacts.";
-const WHATSAPP_HREF = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
+import { WHATSAPP_HREF } from "@/lib/whatsapp";
 
 export function WhatsAppButton() {
   return (
