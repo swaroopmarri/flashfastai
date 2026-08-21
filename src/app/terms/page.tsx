@@ -115,7 +115,7 @@ export default function TermsPage() {
             subsequent periods after that. We generally don&apos;t provide
             refunds for partial months already paid for, except where
             required by law or at our discretion for a genuine service
-            failure on our part — contact us at [EMAIL] and we&apos;ll look
+            failure on our part — contact us at swaroop.indus@gmail.com and we&apos;ll look
             at it case by case.
           </p>
         </section>
@@ -149,7 +149,7 @@ export default function TermsPage() {
         <section>
           <h2 className="mb-2 text-lg font-medium text-gray-900">9. Contact</h2>
           <p>
-            Questions about these Terms: [EMAIL] · [PHONE] · [ADDRESS].
+            Questions about these Terms: swaroop.indus@gmail.com · +1 410-670-0167 · [ADDRESS].
           </p>
         </section>
       </div>

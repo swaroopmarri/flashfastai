@@ -144,8 +144,8 @@ export default async function LandingPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-900">Contact</p>
-              <p className="mt-1 text-sm text-gray-500">[EMAIL]</p>
-              <p className="text-sm text-gray-500">[PHONE]</p>
+              <p className="mt-1 text-sm text-gray-500">swaroop.indus@gmail.com</p>
+              <p className="text-sm text-gray-500">+1 410-670-0167</p>
               <a
                 href={WHATSAPP_HREF}
                 target="_blank"
