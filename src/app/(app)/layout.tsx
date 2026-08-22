@@ -35,7 +35,7 @@ export default async function AppLayout({
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-6">
             <Link href="/dashboard" className="text-lg font-semibold text-gray-900">
-              flashfastai
+              fastflash
             </Link>
             <nav className="flex items-center gap-1">
               <NavLink href="/dashboard">Dashboard</NavLink>

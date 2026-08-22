@@ -14,7 +14,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "flashfastai",
+  title: "fastflash",
   description: "Next.js + Supabase authentication starter",
 };
 

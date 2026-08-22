@@ -19,7 +19,7 @@ export default async function InvitePage({
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
         <h1 className="mb-6 text-center text-2xl font-semibold text-gray-900">
-          flashfastai
+          fastflash
         </h1>
 
         {searchParams.error && (
@@ -38,7 +38,7 @@ export default async function InvitePage({
             <p className="mb-4 text-sm text-gray-600">
               You&apos;ve been invited to join{" "}
               <span className="font-medium text-gray-900">{info.organization_name}</span>{" "}
-              on flashfastai.
+              on fastflash.
             </p>
             <AcceptInviteForm token={params.token} email={info.email} />
           </>

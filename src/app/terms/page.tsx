@@ -1,12 +1,12 @@
 import Link from "next/link";
 
-export const metadata = { title: "Terms of Service — flashfastai" };
+export const metadata = { title: "Terms of Service — fastflash" };
 
 export default function TermsPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-16">
       <Link href="/" className="text-sm text-indigo-600 hover:underline">
-        ← Back to flashfastai
+        ← Back to fastflash
       </Link>
 
       <h1 className="mb-2 mt-6 text-3xl font-semibold text-gray-900">Terms of Service</h1>
@@ -14,10 +14,10 @@ export default function TermsPage() {
 
       <div className="space-y-8 text-gray-700">
         <section>
-          <h2 className="mb-2 text-lg font-medium text-gray-900">1. What flashfastai is</h2>
+          <h2 className="mb-2 text-lg font-medium text-gray-900">1. What fastflash is</h2>
           <p>
-            flashfastai (&quot;the Service&quot;, &quot;we&quot;, &quot;us&quot;) is operated by
-            [BUSINESS_NAME] ([ADDRESS]). The Service lets you upload contact
+            fastflash (&quot;the Service&quot;, &quot;we&quot;, &quot;us&quot;) is operated by
+            fastflash ([ADDRESS]). The Service lets you upload contact
             lists, verify email addresses against a third-party verification
             provider, and send email marketing campaigns to your own
             contacts. By creating an account or using the Service, you agree
@@ -44,7 +44,7 @@ export default function TermsPage() {
           </h2>
           <p>
             This is the most important section for anyone sending email
-            through flashfastai: <strong>you are solely responsible for
+            through fastflash: <strong>you are solely responsible for
             having a lawful basis and appropriate consent to email every
             contact you upload.</strong> The Service does not verify, and
             has no way to verify, how or where you obtained a contact list,
@@ -155,7 +155,7 @@ export default function TermsPage() {
       </div>
 
       <p className="mt-12 rounded-md bg-yellow-50 px-4 py-3 text-xs text-yellow-800">
-        This is a working draft written for how flashfastai actually
+        This is a working draft written for how fastflash actually
         functions today. Replace the bracketed placeholders and have it
         reviewed by a lawyer familiar with your jurisdiction before relying
         on it as your actual Terms of Service.

@@ -15,7 +15,7 @@ export default async function UnsubscribePage({
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm">
-        <h1 className="mb-4 text-xl font-semibold text-gray-900">flashfastai</h1>
+        <h1 className="mb-4 text-xl font-semibold text-gray-900">fastflash</h1>
         {error || !result ? (
           <p className="text-sm text-gray-600">
             This unsubscribe link is invalid or has expired.

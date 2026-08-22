@@ -1,12 +1,12 @@
 import Link from "next/link";
 
-export const metadata = { title: "Privacy Policy — flashfastai" };
+export const metadata = { title: "Privacy Policy — fastflash" };
 
 export default function PrivacyPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-16">
       <Link href="/" className="text-sm text-indigo-600 hover:underline">
-        ← Back to flashfastai
+        ← Back to fastflash
       </Link>
 
       <h1 className="mb-2 mt-6 text-3xl font-semibold text-gray-900">Privacy Policy</h1>
@@ -16,9 +16,9 @@ export default function PrivacyPage() {
         <section>
           <h2 className="mb-2 text-lg font-medium text-gray-900">1. Who this covers</h2>
           <p>
-            This policy explains what [BUSINESS_NAME] (&quot;we&quot;,
-            &quot;us&quot;) collects when you use flashfastai, and — because
-            flashfastai is a tool for emailing your own contacts — it also
+            This policy explains what fastflash (&quot;we&quot;,
+            &quot;us&quot;) collects when you use fastflash, and — because
+            fastflash is a tool for emailing your own contacts — it also
             explains what happens to the contact data you upload about other
             people.
           </p>
@@ -162,7 +162,7 @@ export default function PrivacyPage() {
       </div>
 
       <p className="mt-12 rounded-md bg-yellow-50 px-4 py-3 text-xs text-yellow-800">
-        This is a working draft written for how flashfastai actually
+        This is a working draft written for how fastflash actually
         functions today. Replace the bracketed placeholders and have it
         reviewed by a lawyer familiar with your jurisdiction (and any data
         protection law your recipients fall under) before relying on it as
