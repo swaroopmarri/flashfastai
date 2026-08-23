@@ -2,25 +2,35 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { WHATSAPP_HREF } from "@/lib/whatsapp";
+import { getSiteImageUrl } from "@/lib/siteImages";
+import { NetworkIllustration } from "./_components/NetworkIllustration";
 
 const FEATURES = [
   {
     title: "Verification included",
+    emoji: "✅",
+    accent: "bg-indigo-100 text-indigo-700",
     description:
       "Every contact list is checked against ZeroBounce before you send, so you're not paying to email addresses that will just bounce.",
   },
   {
     title: "Upload any way",
+    emoji: "📤",
+    accent: "bg-sky-100 text-sky-700",
     description:
       "CSV, Excel, or just paste a list — fastflash finds the email column automatically, no template to match.",
   },
   {
     title: "My Network",
+    emoji: "🌐",
+    accent: "bg-amber-100 text-amber-700",
     description:
       "Every contact across every list, grouped by company and deduplicated by email, so you always know who's verified and who isn't.",
   },
   {
     title: "Built-in compliance",
+    emoji: "🛡️",
+    accent: "bg-emerald-100 text-emerald-700",
     description:
       "Every campaign includes a working unsubscribe link, honored automatically and permanently — no re-uploading a suppressed contact by accident.",
   },
@@ -32,6 +42,8 @@ export default async function LandingPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (user) redirect("/dashboard");
+
+  const heroImageUrl = await getSiteImageUrl(supabase, "landing_hero");
 
   return (
     <div className="min-h-screen">
@@ -65,22 +77,35 @@ export default async function LandingPage() {
 
       <main>
         {/* Hero */}
-        <section className="mx-auto max-w-3xl px-4 py-20 text-center">
-          <h1 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
-            Upload, verify, and send email campaigns — all in one place.
-          </h1>
-          <p className="mx-auto mt-6 max-w-xl text-lg text-gray-600">
-            fastflash takes a raw contact list and turns it into a clean,
-            deliverable email campaign: real-time verification, one-click
-            sending, and automatic compliance — no separate tools required.
-          </p>
-          <div className="mt-8">
-            <Link
-              href="/login"
-              className="inline-block rounded-md bg-indigo-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-indigo-500"
-            >
-              Get Started Free
-            </Link>
+        <section className="bg-gradient-to-br from-indigo-50 via-white to-sky-50">
+          <div className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-10 px-4 py-16 sm:py-20 lg:grid-cols-2">
+            <div className="text-center lg:text-left">
+              <h1 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
+                Upload, verify, and send email campaigns — all in one place.
+              </h1>
+              <p className="mx-auto mt-6 max-w-xl text-lg text-gray-600 lg:mx-0">
+                fastflash takes a raw contact list and turns it into a clean,
+                deliverable email campaign: real-time verification, one-click
+                sending, and automatic compliance — no separate tools required.
+              </p>
+              <div className="mt-8">
+                <Link
+                  href="/login"
+                  className="inline-block rounded-md bg-indigo-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-indigo-500"
+                >
+                  Get Started Free
+                </Link>
+              </div>
+            </div>
+
+            <div className="mx-auto aspect-[380/260] w-full max-w-md overflow-hidden rounded-2xl shadow-lg">
+              {heroImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={heroImageUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <NetworkIllustration />
+              )}
+            </div>
           </div>
         </section>
 
@@ -95,6 +120,11 @@ export default async function LandingPage() {
                 key={f.title}
                 className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
               >
+                <div
+                  className={`mb-3 flex h-10 w-10 items-center justify-center rounded-full text-lg ${f.accent}`}
+                >
+                  {f.emoji}
+                </div>
                 <h3 className="mb-2 font-medium text-gray-900">{f.title}</h3>
                 <p className="text-sm text-gray-600">{f.description}</p>
               </div>
@@ -103,34 +133,40 @@ export default async function LandingPage() {
         </section>
 
         {/* Pricing */}
-        <section id="pricing" className="mx-auto max-w-3xl px-4 py-16">
-          <h2 className="mb-10 text-center text-2xl font-semibold text-gray-900">
-            Simple, predictable pricing
-          </h2>
-          <div className="mx-auto max-w-md rounded-lg border-2 border-indigo-200 bg-white p-8 text-center shadow-sm">
-            <p className="text-4xl font-semibold text-gray-900">
-              ₹299<span className="text-base font-normal text-gray-500">/month</span>
-            </p>
-            <p className="mt-1 text-sm text-gray-500">Up to 3,999 contacts</p>
+        <section id="pricing" className="bg-gradient-to-b from-white to-indigo-50/60 py-16">
+          <div className="mx-auto max-w-3xl px-4">
+            <h2 className="mb-10 text-center text-2xl font-semibold text-gray-900">
+              Simple, predictable pricing
+            </h2>
+            <div className="mx-auto max-w-md overflow-hidden rounded-lg border border-indigo-200 bg-white text-center shadow-sm">
+              <div className="bg-gradient-to-r from-indigo-600 to-sky-500 px-8 py-6 text-white">
+                <p className="text-4xl font-semibold">
+                  ₹299<span className="text-base font-normal opacity-80">/month</span>
+                </p>
+                <p className="mt-1 text-sm opacity-90">Up to 3,999 contacts</p>
+              </div>
 
-            <ul className="mt-6 space-y-2 text-left text-sm text-gray-700">
-              <li>✓ Email verification included, not billed separately</li>
-              <li>✓ Unlimited campaigns</li>
-              <li>✓ My Network — company-grouped, deduplicated contacts</li>
-              <li>✓ Automatic unsubscribe &amp; suppression handling</li>
-            </ul>
+              <div className="p-8">
+                <ul className="space-y-2 text-left text-sm text-gray-700">
+                  <li>✓ Email verification included, not billed separately</li>
+                  <li>✓ Unlimited campaigns</li>
+                  <li>✓ My Network — company-grouped, deduplicated contacts</li>
+                  <li>✓ Automatic unsubscribe &amp; suppression handling</li>
+                </ul>
 
-            <Link
-              href="/login"
-              className="mt-8 block rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"
-            >
-              Get Started Free
-            </Link>
+                <Link
+                  href="/login"
+                  className="mt-8 block rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"
+                >
+                  Get Started Free
+                </Link>
 
-            <p className="mt-4 text-xs text-gray-400">
-              Most competitors charge more, and bill email verification as a
-              separate add-on. Here, it&apos;s already included.
-            </p>
+                <p className="mt-4 text-xs text-gray-400">
+                  Most competitors charge more, and bill email verification as
+                  a separate add-on. Here, it&apos;s already included.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
       </main>

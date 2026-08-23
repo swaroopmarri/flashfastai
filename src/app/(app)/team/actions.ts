@@ -90,3 +90,54 @@ export async function removeMember(membershipId: string) {
 
   revalidatePath("/team");
 }
+
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** Uploads a replacement image for a named public-site slot (e.g.
+ * "landing_hero"), stored in the "site-images" bucket (migration 0010) and
+ * recorded in site_images so the public landing page knows which file is
+ * current. Storage RLS also enforces admin-only writes on that bucket, so
+ * this check is defense in depth, not the only gate. */
+export async function uploadSiteImage(slot: string, formData: FormData) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated.");
+  await requireAdmin(supabase);
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("Choose an image file.");
+  }
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    throw new Error("Only JPEG, PNG, or WebP images are supported.");
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error("Image must be under 5MB.");
+  }
+
+  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${slot}-${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("site-images")
+    .upload(path, file, { contentType: file.type });
+  if (uploadError) throw uploadError;
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("site-images").getPublicUrl(path);
+
+  const { error } = await supabase.from("site_images").upsert({
+    slot,
+    url: publicUrl,
+    updated_by: user.id,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+
+  revalidatePath("/");
+  revalidatePath("/team");
+}

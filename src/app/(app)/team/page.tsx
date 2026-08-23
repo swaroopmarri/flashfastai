@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { getCurrentMembership } from "@/lib/organizations";
+import { getSiteImageUrl } from "@/lib/siteImages";
 import { InviteMemberForm } from "./InviteMemberForm";
 import { MemberRow, type OrgMember } from "./MemberRow";
+import { SiteImageUploadForm } from "./SiteImageUploadForm";
 
 export default async function TeamPage() {
   const supabase = createClient();
@@ -38,6 +40,7 @@ export default async function TeamPage() {
   const totalSendQuota = (members as OrgMember[]).reduce((sum, m) => sum + m.send_quota, 0);
   const totalSendUsed = (members as OrgMember[]).reduce((sum, m) => sum + m.send_used, 0);
   const isSolo = (members as OrgMember[]).length === 1;
+  const heroImageUrl = await getSiteImageUrl(supabase, "landing_hero");
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -84,6 +87,19 @@ export default async function TeamPage() {
       <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="mb-3 text-lg font-medium text-gray-900">Invite a member</h2>
         <InviteMemberForm />
+      </div>
+
+      <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="mb-3 text-lg font-medium text-gray-900">Landing Page Image</h2>
+        <p className="mb-4 text-sm text-gray-500">
+          Replaces the illustration shown on the public landing page hero.
+          Visible to every visitor, logged in or not.
+        </p>
+        <SiteImageUploadForm
+          slot="landing_hero"
+          label="Hero image"
+          currentUrl={heroImageUrl}
+        />
       </div>
 
       <h2 className="mb-3 text-lg font-medium text-gray-900">Members</h2>
