@@ -1,30 +1,24 @@
 /**
- * Single source of truth for fastflash's pricing tiers. Update a price or
- * quota here and it's reflected everywhere it's used, instead of hunting
- * through the landing page (and, once real plan-based billing exists,
- * wherever quotas get provisioned) separately.
+ * Pricing tiers shown on the public landing page ONLY (src/app/page.tsx).
+ * Update a price or quota here and it's reflected there.
  *
- * Quotas are sized for 50%+ gross margin against the CURRENTLY INTEGRATED
- * verification provider -- ZeroBounce, at ~₹0.76/verification via their
- * ONE subscription billed annually (public list price, not a confirmed
- * negotiated rate) -- plus AWS SES sending (~₹0.01/email) and a small
- * per-customer overhead allowance. Each contact is assumed verified once
- * and sent to once per month (worst case: the customer uses the full
- * quota every month).
+ * These contact numbers are sized for 50%+ gross margin against
+ * MillionVerifier's 1M-credit plan (~₹0.043/verification) plus AWS SES
+ * sending (~₹0.01/email) and a small per-customer overhead allowance --
+ * NOT against ZeroBounce, which is what the app actually calls today
+ * (src/lib/zerobounce.ts). MillionVerifier is NOT integrated yet.
  *
- * NOT using the cheaper MillionVerifier-based numbers that were also
- * discussed, since that provider isn't actually wired into the app --
- * src/lib/zerobounce.ts is ZeroBounce-specific. Raise these once either
- * (a) MillionVerifier (or another cheaper provider) is actually
- * integrated, or (b) your real negotiated ZeroBounce rate is confirmed
- * lower than this public-list-price estimate.
+ * This is a deliberate, display-only choice: these numbers are marketing
+ * copy, not an enforced quota. They do NOT match what a customer signing
+ * up today would actually get -- every new organization still gets the
+ * flat default quota from migrations 0002/0003 (10,000 validation +
+ * 10,000 send, ZeroBounce-backed), and plan selection isn't wired into
+ * signup/billing at all yet (no payment flow exists).
  *
- * IMPORTANT: these plan definitions are NOT yet wired into actual
- * signup/billing. Every new organization still gets the flat default
- * quota set in migrations 0002/0003 (10,000 validation + 10,000 send).
- * Letting a customer pick one of these plans at signup and having it
- * automatically provision this quota is a separate, larger feature that
- * needs a real payment flow (Razorpay/Stripe/etc.) -- not built yet.
+ * Before a real customer could actually be provisioned at these contact
+ * volumes, MillionVerifier needs to be integrated for real -- otherwise
+ * fulfilling these numbers against ZeroBounce's real (higher) cost would
+ * run at a loss, not a 50%+ margin.
  */
 export interface PricingPlan {
   id: string;
@@ -37,8 +31,8 @@ export interface PricingPlan {
 }
 
 export const PRICING_PLANS: PricingPlan[] = [
-  { id: "starter", name: "Starter", priceInr: 499, contacts: 250 },
-  { id: "growth", name: "Growth", priceInr: 999, contacts: 550 },
-  { id: "pro", name: "Pro", priceInr: 1999, contacts: 1200 },
-  { id: "scale", name: "Scale", priceInr: 4999, contacts: 3000 },
+  { id: "starter", name: "Starter", priceInr: 499, contacts: 3500 },
+  { id: "growth", name: "Growth", priceInr: 999, contacts: 8000 },
+  { id: "pro", name: "Pro", priceInr: 1999, contacts: 17000 },
+  { id: "scale", name: "Scale", priceInr: 4999, contacts: 45000 },
 ];
