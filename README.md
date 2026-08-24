@@ -25,7 +25,7 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    | `CRON_SECRET` | Any long random string you generate (e.g. `openssl rand -hex 32`) |
    | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | An IAM user scoped to SES — see **Setting up Amazon SES** below |
    | `AWS_REGION` | The AWS region your SES identity is verified in, e.g. `us-east-1` |
-   | `SES_FROM_ADDRESS` | The verified sender address campaigns send from, e.g. `campaigns@fastflash.com` |
+   | `SES_FROM_ADDRESS` | The verified sender address campaigns send from, e.g. `campaigns@campaign-monster.com` |
    | `SES_NOTIFICATIONS_SECRET` | Any long random string you generate — optional, only needed for SES bounce/complaint feedback (see **Setting up SES bounce and complaint feedback**) |
 
    The two `NEXT_PUBLIC_` values are safe to expose in the browser — they're scoped by Supabase Row Level Security, not secrets. The rest are server-only and must never be prefixed with `NEXT_PUBLIC_`:
@@ -55,7 +55,7 @@ Campaign sending won't work until this is done:
    - Domain ownership is confirmed via a TXT or CNAME record SES also provides.
    - Verification usually completes within minutes to a few hours once DNS propagates.
    - Alternative for quick testing: verify a single **email address** identity instead of a domain — faster, but only that exact address can send, and (in sandbox) only to other verified addresses.
-2. **Set `SES_FROM_ADDRESS`** to an address at that verified domain (e.g. `campaigns@fastflash.com`) — no separate per-address verification needed once the domain itself is verified.
+2. **Set `SES_FROM_ADDRESS`** to an address at that verified domain (e.g. `campaigns@campaign-monster.com`) — no separate per-address verification needed once the domain itself is verified.
 3. **Sandbox mode**: every new SES account starts in the sandbox — you can only send **to** addresses/domains that are also verified, at a low rate (~1 email/sec, ~200/day). To send to arbitrary recipients, go to the SES console → **Account dashboard → Request production access** (a short form; usually approved within 24 hours). Until then, add your own test addresses as verified identities to test end-to-end.
 4. **Create an IAM user** with a policy granting `ses:SendEmail` (scope the resource to your verified identity's ARN if you want to be strict), and generate an access key pair for it → that's your `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`.
 

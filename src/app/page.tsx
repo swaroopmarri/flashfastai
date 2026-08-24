@@ -19,7 +19,7 @@ const FEATURES = [
     emoji: "📤",
     accent: "bg-sky-100 text-sky-700",
     description:
-      "CSV, Excel, or just paste a list — fastflash finds the email column automatically, no template to match.",
+      "CSV, Excel, or just paste a list — Campaign Monster finds the email column automatically, no template to match.",
   },
   {
     title: "My Network",
@@ -50,7 +50,7 @@ export default async function LandingPage() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <span className="text-lg font-semibold text-gray-900">fastflash</span>
+          <span className="text-lg font-semibold text-gray-900">Campaign Monster</span>
           <nav className="hidden items-center gap-6 text-sm text-gray-600 sm:flex">
             <a href="#features" className="hover:text-gray-900">
               Features
@@ -85,7 +85,7 @@ export default async function LandingPage() {
                 Upload, verify, and send email campaigns — all in one place.
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg text-gray-600 lg:mx-0">
-                fastflash takes a raw contact list and turns it into a clean,
+                Campaign Monster takes a raw contact list and turns it into a clean,
                 deliverable email campaign: real-time verification, one-click
                 sending, and automatic compliance — no separate tools required.
               </p>
@@ -208,7 +208,7 @@ export default async function LandingPage() {
         <div className="mx-auto max-w-5xl px-4 py-10">
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
             <div>
-              <p className="font-medium text-gray-900">fastflash</p>
+              <p className="font-medium text-gray-900">Campaign Monster</p>
               <p className="mt-1 text-sm text-gray-500">[ADDRESS]</p>
             </div>
             <div>
@@ -240,7 +240,7 @@ export default async function LandingPage() {
             </div>
           </div>
           <p className="mt-8 border-t border-gray-100 pt-6 text-xs text-gray-400">
-            © {new Date().getFullYear()} fastflash. All rights reserved.
+            © {new Date().getFullYear()} Campaign Monster. All rights reserved.
           </p>
         </div>
       </footer>
