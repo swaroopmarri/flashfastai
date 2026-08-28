@@ -35,24 +35,16 @@ export async function signup(formData: FormData) {
   const organizationName = (formData.get("organizationName") as string).trim();
   const firstName = (formData.get("firstName") as string).trim();
   const lastName = (formData.get("lastName") as string).trim();
-  const currentCompany = (formData.get("currentCompany") as string).trim();
   const yearsExperienceRaw = formData.get("yearsExperience") as string;
   const yearsExperience = Number(yearsExperienceRaw);
 
   if (!organizationName) {
     redirect(`/login?error=${encodeURIComponent("Organization name is required to sign up.")}`);
   }
-  if (
-    !firstName ||
-    !lastName ||
-    !currentCompany ||
-    !yearsExperienceRaw ||
-    Number.isNaN(yearsExperience) ||
-    yearsExperience < 0
-  ) {
+  if (!firstName || !lastName || !yearsExperienceRaw || Number.isNaN(yearsExperience) || yearsExperience < 0) {
     redirect(
       `/login?error=${encodeURIComponent(
-        "First name, last name, current company, and years of experience are all required to sign up.",
+        "First name, last name, and years of experience are all required to sign up.",
       )}`,
     );
   }
@@ -73,7 +65,6 @@ export async function signup(formData: FormData) {
         pending_org_name: organizationName,
         pending_first_name: firstName,
         pending_last_name: lastName,
-        pending_current_company: currentCompany,
         pending_years_experience: yearsExperience,
       },
     },

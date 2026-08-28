@@ -45,7 +45,8 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    - `supabase/migrations/0005_contact_list_summaries.sql` — adds `get_contact_list_status_counts()`, a grouped-aggregate function backing the Contacts overview cards.
    - `supabase/migrations/0006_network.sql` — adds "My Network" (company/domain grouping across every list) and lets verification jobs and campaigns target a company domain instead of only one list.
    - `supabase/migrations/0007_suppression.sql` — adds a `reason` column to `unsubscribes` (unsubscribe-link click vs. SES spam complaint), a `resubscribe_log` audit table, and `resubscribe_contact()` for manual resubscribes.
-   - `supabase/migrations/0011_profiles.sql` — adds `profiles` (first name, last name, current company, years of experience), collected at signup and editable from `/account`.
+   - `supabase/migrations/0011_profiles.sql` — adds `profiles` (first name, last name, years of experience), collected at signup and editable from `/account`.
+   - `supabase/migrations/0012_drop_profile_company.sql` — drops `profiles.current_company`; the org's own name (`organizations.name`) is used instead, so it was a redundant duplicate field.
 
 ## Setting up Amazon SES
 
@@ -93,7 +94,7 @@ This endpoint is protected by the `secret` query param, not full SNS message-sig
 - `src/app/contacts` — contact list overview, CSV/Excel upload & merge (`UploadForm.tsx`), per-list detail page with a "Verify Contacts" button (`[listId]/VerifyPanel.tsx`)
 - `src/app/campaigns` — campaign builder: `new` creates a draft campaign against a contact list, `[id]/audience` filters to deliverable-only or includes risky, `[id]/compose` writes subject/body + Reply-To and sends
 - `src/app/team` — admin-only Team page: invite members, view/edit their quotas, see org-wide usage totals
-- `src/app/(app)/account` — edit profile (first/last name, current company, years of experience) and request an office email change; `src/lib/officeEmail.ts` blocks personal-provider domains (Gmail, Yahoo, Outlook.com, etc.) both here and at signup
+- `src/app/(app)/account` — edit profile (first/last name, years of experience) and request an office email change; `src/lib/officeEmail.ts` blocks personal-provider domains (Gmail, Yahoo, Outlook.com, etc.) both here and at signup
 - `src/app/invite/[token]` — public invite-acceptance page; sets a password and joins the inviting org
 - `src/app/unsubscribe/[token]` — public, unauthenticated page a recipient lands on from the unsubscribe link in a campaign email
 - `src/app/api/verification-jobs/[jobId]` — polling endpoint the browser calls while a bulk ZeroBounce verification job runs in the background

@@ -7,7 +7,6 @@ import { ChangeEmailForm } from "./ChangeEmailForm";
 const EMPTY_PROFILE: ProfileValues = {
   firstName: "",
   lastName: "",
-  currentCompany: "",
   yearsExperience: "",
 };
 
@@ -21,7 +20,7 @@ export default async function AccountPage() {
   let profile: ProfileValues = EMPTY_PROFILE;
   const { data, error } = await supabase
     .from("profiles")
-    .select("first_name, last_name, current_company, years_experience")
+    .select("first_name, last_name, years_experience")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -30,7 +29,6 @@ export default async function AccountPage() {
     profile = {
       firstName: data.first_name,
       lastName: data.last_name,
-      currentCompany: data.current_company,
       yearsExperience: data.years_experience,
     };
   }

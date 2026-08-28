@@ -1,12 +1,12 @@
--- Per-user profile info collected at signup (name, current company, years of
--- experience). Run this in the Supabase dashboard: SQL Editor -> New query ->
--- paste -> Run. Run AFTER 0002_organizations.sql.
+-- Per-user profile info collected at signup (name, years of experience --
+-- current company is represented by the org's own name in `organizations`,
+-- not repeated here). Run this in the Supabase dashboard: SQL Editor -> New
+-- query -> paste -> Run. Run AFTER 0002_organizations.sql.
 
 create table if not exists public.profiles (
   user_id uuid primary key references auth.users(id) on delete cascade,
   first_name text not null,
   last_name text not null,
-  current_company text not null,
   years_experience integer not null check (years_experience >= 0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

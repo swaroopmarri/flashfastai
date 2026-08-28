@@ -13,20 +13,16 @@ export async function updateProfile(formData: FormData) {
 
   const firstName = (formData.get("firstName") as string).trim();
   const lastName = (formData.get("lastName") as string).trim();
-  const currentCompany = (formData.get("currentCompany") as string).trim();
   const yearsExperience = Number(formData.get("yearsExperience"));
 
-  if (!firstName || !lastName || !currentCompany || Number.isNaN(yearsExperience) || yearsExperience < 0) {
-    throw new Error(
-      "First name, last name, current company, and years of experience are all required.",
-    );
+  if (!firstName || !lastName || Number.isNaN(yearsExperience) || yearsExperience < 0) {
+    throw new Error("First name, last name, and years of experience are all required.");
   }
 
   const { error } = await supabase.from("profiles").upsert({
     user_id: user.id,
     first_name: firstName,
     last_name: lastName,
-    current_company: currentCompany,
     years_experience: yearsExperience,
     updated_at: new Date().toISOString(),
   });

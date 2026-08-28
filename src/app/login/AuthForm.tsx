@@ -84,18 +84,6 @@ export function AuthForm() {
             </div>
           </div>
           <div>
-            <label htmlFor="currentCompany" className={labelClass}>
-              Current company
-            </label>
-            <input
-              id="currentCompany"
-              name="currentCompany"
-              type="text"
-              required
-              className={inputClass}
-            />
-          </div>
-          <div>
             <label htmlFor="yearsExperience" className={labelClass}>
               Years of total experience
             </label>

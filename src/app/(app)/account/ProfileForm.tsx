@@ -6,7 +6,6 @@ import { updateProfile } from "./actions";
 export interface ProfileValues {
   firstName: string;
   lastName: string;
-  currentCompany: string;
   yearsExperience: number | "";
 }
 
@@ -60,19 +59,6 @@ export function ProfileForm({ initial }: { initial: ProfileValues }) {
             className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           />
         </div>
-      </div>
-      <div>
-        <label htmlFor="currentCompany" className="block text-sm font-medium text-gray-700">
-          Current company
-        </label>
-        <input
-          id="currentCompany"
-          name="currentCompany"
-          type="text"
-          defaultValue={initial.currentCompany}
-          required
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-        />
       </div>
       <div>
         <label htmlFor="yearsExperience" className="block text-sm font-medium text-gray-700">

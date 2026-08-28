@@ -76,16 +76,14 @@ export async function finalizeSignup(
 async function ensureProfile(supabase: SupabaseClient, user: User): Promise<void> {
   const firstName = user.user_metadata?.pending_first_name as string | undefined;
   const lastName = user.user_metadata?.pending_last_name as string | undefined;
-  const currentCompany = user.user_metadata?.pending_current_company as string | undefined;
   const yearsExperience = user.user_metadata?.pending_years_experience as number | undefined;
 
-  if (!firstName || !lastName || !currentCompany || yearsExperience === undefined) return;
+  if (!firstName || !lastName || yearsExperience === undefined) return;
 
   const { error } = await supabase.from("profiles").upsert({
     user_id: user.id,
     first_name: firstName,
     last_name: lastName,
-    current_company: currentCompany,
     years_experience: yearsExperience,
   });
   if (error) throw error;
