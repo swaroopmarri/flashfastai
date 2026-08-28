@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { WHATSAPP_HREF } from "@/lib/whatsapp";
-import { getSiteImageUrl } from "@/lib/siteImages";
 import { PRICING_PLANS } from "@/lib/pricingPlans";
 import { NetworkIllustration } from "./_components/NetworkIllustration";
 
@@ -43,8 +42,6 @@ export default async function LandingPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (user) redirect("/dashboard");
-
-  const heroImageUrl = await getSiteImageUrl(supabase, "landing_hero");
 
   return (
     <div className="min-h-screen">
@@ -100,12 +97,7 @@ export default async function LandingPage() {
             </div>
 
             <div className="mx-auto aspect-[380/260] w-full max-w-md overflow-hidden rounded-2xl shadow-lg">
-              {heroImageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={heroImageUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <NetworkIllustration />
-              )}
+              <NetworkIllustration />
             </div>
           </div>
         </section>
