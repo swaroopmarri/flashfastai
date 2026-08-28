@@ -1,4 +1,5 @@
 import { AuthForm } from "./AuthForm";
+import { ClearUrlParams } from "./ClearUrlParams";
 
 export default function LoginPage({
   searchParams,
@@ -24,6 +25,7 @@ export default function LoginPage({
         )}
 
         <AuthForm />
+        <ClearUrlParams shouldClear={Boolean(searchParams.error || searchParams.message)} />
       </div>
     </div>
   );
