@@ -53,6 +53,8 @@ export async function finalizeSignup(
   const existing = await getCurrentMembership(supabase);
   if (existing) return;
 
+  await ensureProfile(supabase, user);
+
   const inviteToken = user.user_metadata?.pending_invite_token as string | undefined;
   if (inviteToken) {
     const { error } = await supabase.rpc("accept_invite", { p_token: inviteToken });
@@ -62,5 +64,29 @@ export async function finalizeSignup(
 
   const orgName = (user.user_metadata?.pending_org_name as string | undefined) || "My Organization";
   const { error } = await supabase.rpc("create_organization", { p_name: orgName });
+  if (error) throw error;
+}
+
+/**
+ * Creates the profiles row from signup-time metadata (see signup() in
+ * app/login/actions.ts). No-op if that metadata isn't present -- e.g. an
+ * invited member who joined via an invite link rather than the signup form
+ * doesn't have it, and fills in their profile later from /account instead.
+ */
+async function ensureProfile(supabase: SupabaseClient, user: User): Promise<void> {
+  const firstName = user.user_metadata?.pending_first_name as string | undefined;
+  const lastName = user.user_metadata?.pending_last_name as string | undefined;
+  const currentCompany = user.user_metadata?.pending_current_company as string | undefined;
+  const yearsExperience = user.user_metadata?.pending_years_experience as number | undefined;
+
+  if (!firstName || !lastName || !currentCompany || yearsExperience === undefined) return;
+
+  const { error } = await supabase.from("profiles").upsert({
+    user_id: user.id,
+    first_name: firstName,
+    last_name: lastName,
+    current_company: currentCompany,
+    years_experience: yearsExperience,
+  });
   if (error) throw error;
 }

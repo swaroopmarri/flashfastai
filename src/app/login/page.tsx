@@ -29,7 +29,7 @@ export default function LoginPage({
               htmlFor="email"
               className="block text-sm font-medium text-gray-700"
             >
-              Email
+              Office email
             </label>
             <input
               id="email"
@@ -38,6 +38,11 @@ export default function LoginPage({
               required
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Sign up requires a work/office email address -- personal
+              providers like Gmail, Yahoo, or Outlook.com aren&apos;t
+              accepted.
+            </p>
           </div>
           <div>
             <label
@@ -55,13 +60,17 @@ export default function LoginPage({
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
           </div>
+
+          <p className="border-t border-gray-100 pt-4 text-xs font-medium uppercase tracking-wide text-gray-400">
+            Only needed for Sign up
+          </p>
+
           <div>
             <label
               htmlFor="organizationName"
               className="block text-sm font-medium text-gray-700"
             >
-              Organization name{" "}
-              <span className="font-normal text-gray-400">(only needed for Sign up)</span>
+              Organization name
             </label>
             <input
               id="organizationName"
@@ -74,6 +83,66 @@ export default function LoginPage({
               an existing one instead, use the invite link your admin sent
               you.
             </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                htmlFor="firstName"
+                className="block text-sm font-medium text-gray-700"
+              >
+                First name
+              </label>
+              <input
+                id="firstName"
+                name="firstName"
+                type="text"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="lastName"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Last name
+              </label>
+              <input
+                id="lastName"
+                name="lastName"
+                type="text"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label
+              htmlFor="currentCompany"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Current company
+            </label>
+            <input
+              id="currentCompany"
+              name="currentCompany"
+              type="text"
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="yearsExperience"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Years of total experience
+            </label>
+            <input
+              id="yearsExperience"
+              name="yearsExperience"
+              type="number"
+              min={0}
+              step={1}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
           </div>
 
           <div className="flex flex-col gap-2 pt-2">

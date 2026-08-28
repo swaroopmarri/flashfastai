@@ -48,6 +48,12 @@ export default async function AppLayout({
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-gray-500 sm:inline">{user.email}</span>
+            <Link
+              href="/account"
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Account
+            </Link>
             <form action={logout}>
               <button
                 type="submit"

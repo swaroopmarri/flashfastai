@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/utils/supabase/server";
 import { finalizeSignup } from "@/lib/organizations";
+import { isPersonalEmailDomain } from "@/lib/officeEmail";
 
 export async function login(formData: FormData) {
   const supabase = createClient();
@@ -29,12 +30,38 @@ export async function signup(formData: FormData) {
   const supabase = createClient();
   const origin = headers().get("origin");
 
-  const email = formData.get("email") as string;
+  const email = (formData.get("email") as string).trim().toLowerCase();
   const password = formData.get("password") as string;
   const organizationName = (formData.get("organizationName") as string).trim();
+  const firstName = (formData.get("firstName") as string).trim();
+  const lastName = (formData.get("lastName") as string).trim();
+  const currentCompany = (formData.get("currentCompany") as string).trim();
+  const yearsExperienceRaw = formData.get("yearsExperience") as string;
+  const yearsExperience = Number(yearsExperienceRaw);
 
   if (!organizationName) {
     redirect(`/login?error=${encodeURIComponent("Organization name is required to sign up.")}`);
+  }
+  if (
+    !firstName ||
+    !lastName ||
+    !currentCompany ||
+    !yearsExperienceRaw ||
+    Number.isNaN(yearsExperience) ||
+    yearsExperience < 0
+  ) {
+    redirect(
+      `/login?error=${encodeURIComponent(
+        "First name, last name, current company, and years of experience are all required to sign up.",
+      )}`,
+    );
+  }
+  if (isPersonalEmailDomain(email)) {
+    redirect(
+      `/login?error=${encodeURIComponent(
+        "Please sign up with your work/office email address, not a personal email provider.",
+      )}`,
+    );
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -42,7 +69,13 @@ export async function signup(formData: FormData) {
     password,
     options: {
       emailRedirectTo: `${origin}/auth/callback`,
-      data: { pending_org_name: organizationName },
+      data: {
+        pending_org_name: organizationName,
+        pending_first_name: firstName,
+        pending_last_name: lastName,
+        pending_current_company: currentCompany,
+        pending_years_experience: yearsExperience,
+      },
     },
   });
 
