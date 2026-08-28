@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { getCurrentMembership } from "@/lib/organizations";
+import { isMissingSchemaError } from "@/lib/schemaGuard";
 import { InviteMemberForm } from "./InviteMemberForm";
 import { MemberRow, type OrgMember } from "./MemberRow";
+import { BillingSection } from "./BillingSection";
 
 export default async function TeamPage() {
   const supabase = createClient();
@@ -38,6 +40,13 @@ export default async function TeamPage() {
   const totalSendQuota = (members as OrgMember[]).reduce((sum, m) => sum + m.send_quota, 0);
   const totalSendUsed = (members as OrgMember[]).reduce((sum, m) => sum + m.send_used, 0);
   const isSolo = (members as OrgMember[]).length === 1;
+
+  const { data: subscription, error: subscriptionError } = await supabase
+    .from("subscriptions")
+    .select("plan_id, status")
+    .eq("organization_id", membership.organization_id)
+    .maybeSingle();
+  if (subscriptionError && !isMissingSchemaError(subscriptionError)) throw subscriptionError;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -79,6 +88,14 @@ export default async function TeamPage() {
             </p>
           )}
         </div>
+      </div>
+
+      <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="mb-3 text-lg font-medium text-gray-900">Plan &amp; billing</h2>
+        <BillingSection
+          currentPlanId={subscription?.plan_id ?? null}
+          status={subscription?.status ?? null}
+        />
       </div>
 
       <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">

@@ -27,6 +27,8 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    | `AWS_REGION` | The AWS region your SES identity is verified in, e.g. `us-east-1` |
    | `SES_FROM_ADDRESS` | The verified sender address campaigns send from, e.g. `campaigns@campaign-monster.com` |
    | `SES_NOTIFICATIONS_SECRET` | Any long random string you generate — optional, only needed for SES bounce/complaint feedback (see **Setting up SES bounce and complaint feedback**) |
+   | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Razorpay dashboard → Settings → API Keys — see **Setting up Razorpay billing** |
+   | `RAZORPAY_WEBHOOK_SECRET` | The secret you set when creating the Razorpay webhook — see **Setting up Razorpay billing** |
 
    The two `NEXT_PUBLIC_` values are safe to expose in the browser — they're scoped by Supabase Row Level Security, not secrets. The rest are server-only and must never be prefixed with `NEXT_PUBLIC_`:
    - `ZEROBOUNCE_API_KEY` is only read in Server Actions / Route Handlers.
@@ -34,8 +36,10 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    - `CRON_SECRET` protects `/api/cron/reset-quotas` from being invoked by anyone else. Vercel automatically sends it as a Bearer token when it triggers the cron job, once the same value is set in your Vercel project.
    - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are only read in `src/lib/ses.ts`, called from Server Actions and the send-job poll route — never bundled to the client.
    - `SES_NOTIFICATIONS_SECRET` protects `/api/ses/notifications` the same way `CRON_SECRET` protects the cron route — it's a query-string token (`?secret=...`) rather than a header, since that's what an SNS HTTPS subscription URL supports.
+   - `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` are only read in `src/lib/razorpay.ts`, called from the billing Server Actions (`src/app/(app)/team/billingActions.ts`) — never bundled to the client.
+   - `RAZORPAY_WEBHOOK_SECRET` protects `/api/razorpay/webhook` by verifying Razorpay's HMAC signature on every request (the `x-razorpay-signature` header) — unlike the SES/cron secrets, this isn't a shared-secret query param, it's a real cryptographic signature check.
 
-   In **Vercel**, add all nine under Project → Settings → Environment Variables (check Production, Preview, and Development), then redeploy — env var changes don't apply to already-running deployments.
+   In **Vercel**, add all twelve under Project → Settings → Environment Variables (check Production, Preview, and Development), then redeploy — env var changes don't apply to already-running deployments.
 
 4. Run the database migrations, **in order**. Open the Supabase dashboard → **SQL Editor → New query** for each:
    - `supabase/migrations/0001_contacts_and_campaigns.sql` — creates `contact_lists`, `contacts`, `verification_jobs`, `campaigns`.
@@ -47,6 +51,7 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    - `supabase/migrations/0007_suppression.sql` — adds a `reason` column to `unsubscribes` (unsubscribe-link click vs. SES spam complaint), a `resubscribe_log` audit table, and `resubscribe_contact()` for manual resubscribes.
    - `supabase/migrations/0011_profiles.sql` — adds `profiles` (first name, last name, years of experience), collected at signup and editable from `/account`.
    - `supabase/migrations/0012_drop_profile_company.sql` — drops `profiles.current_company`; the org's own name (`organizations.name`) is used instead, so it was a redundant duplicate field.
+   - `supabase/migrations/0013_billing.sql` — adds `subscriptions` (one row per org: Razorpay subscription id, plan, status, current billing cycle dates), written only by the Razorpay webhook (plus an initial placeholder row from `startSubscription()`) — see **Setting up Razorpay billing**.
 
 ## Setting up Amazon SES
 
@@ -86,6 +91,27 @@ Everything else in this app works without this — sending, verification, unsubs
 
 This endpoint is protected by the `secret` query param, not full SNS message-signature verification — sufficient to stop opportunistic abuse of a discovered URL, but not as strong as cryptographically verifying every request came from AWS. If you want that stronger guarantee, `src/app/api/ses/notifications/route.ts` is where to add it.
 
+## Setting up Razorpay billing
+
+Real self-service subscriptions (upgrade/downgrade/cancel on the Team page) won't work until this is done. Everything else in the app works fine without it — the four pricing tiers still show on the landing page either way.
+
+1. **Create a Razorpay account** at [razorpay.com](https://razorpay.com) if you don't have one, and get it activated for live payments (test mode works for trying this out first).
+2. **Get your API keys**: Dashboard → **Settings → API Keys → Generate Key** → set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`.
+3. **Create four Plans** (one per pricing tier), either in the dashboard (**Subscriptions → Plans → Create Plan**) or via the API:
+   - Each Plan needs `period: "monthly"`, `interval: 1`, and an `item` with the tier's price in **paise** (e.g. ₹499/mo → `amount: 49900`) — match the prices in `src/lib/pricingPlans.ts` (Starter ₹499, Growth ₹999, Pro ₹1,999, Scale ₹4,999).
+   - Copy each resulting Plan ID (e.g. `plan_ABC123`) into the matching `razorpayPlanId` field in `src/lib/pricingPlans.ts`, replacing the `REPLACE_WITH_..._RAZORPAY_PLAN_ID` placeholders. Subscriptions can't be created until this is done.
+4. **Create a webhook**: Dashboard → **Settings → Webhooks → Add New Webhook**:
+   - **URL**: `https://<your-app-domain>/api/razorpay/webhook`
+   - **Secret**: any value you choose — set it as `RAZORPAY_WEBHOOK_SECRET` too (must match exactly).
+   - **Active events**: enable at least `subscription.activated`, `subscription.charged`, `subscription.updated`, `subscription.cancelled`, `subscription.halted`, `subscription.completed`.
+5. That's it — an admin can now subscribe/switch/cancel plans from the Team page's "Plan & billing" section.
+
+**How quota provisioning actually works** (why this is safe against a spoofed or replayed "payment succeeded" client request): the webhook is the *only* place `organizations.plan_validation_quota`/`plan_send_quota` and `subscriptions.status`/`plan_id` ever get written after the initial subscribe. `startSubscription()` only creates a Razorpay subscription and a placeholder DB row (status `created`, no quota granted); `changePlan()`/`cancelSubscription()` only call the Razorpay API. None of them trust anything the browser reports back — every actual state change comes from `src/app/api/razorpay/webhook/route.ts` verifying Razorpay's own signed request first.
+
+**Upgrade/downgrade**, once a subscription is active, calls Razorpay's `subscriptions.update()` with `schedule_change_at: "now"` — takes effect immediately (no proration logic beyond whatever Razorpay itself applies). There's no "pause and resume mid-cycle" refinement here; that's a reasonable future improvement if needed.
+
+**On cancellation**, the org's quota is left as-is rather than reset to some "free tier" — there isn't one defined anywhere in this app (every org's quota otherwise defaults to a flat 10,000/10,000 from migrations 0002/0003, which is actually more generous than any paid tier). If you want cancellation to actually reduce quota, that policy needs to be decided and added to the webhook handler's `subscription.cancelled` case.
+
 ## Structure
 
 - `src/app/login` — email/password login + signup form (Server Actions in `actions.ts`)
@@ -121,6 +147,10 @@ This endpoint is protected by the `secret` query param, not full SNS message-sig
 - `src/app/(app)/_components/ResubscribeButton.tsx` — the confirm-then-resubscribe UI for one email
 - `src/app/api/ses/notifications` — webhook SES's SNS topic posts bounce/complaint feedback to; protected by a `?secret=` query token (`SES_NOTIFICATIONS_SECRET`)
 - `src/lib/sesFeedback.ts` — applies a complaint (adds to `unsubscribes`, reason `'complaint'`) or a permanent bounce (marks the contact `undeliverable`) once the webhook has matched an SES notification back to a specific recipient
+- `src/lib/razorpay.ts` — thin Razorpay client wrapper (`getRazorpayClient`)
+- `src/app/(app)/team/billingActions.ts` — `startSubscription`/`changePlan`/`cancelSubscription` Server Actions; call the Razorpay API but never write subscription status/quota directly (see **Setting up Razorpay billing**)
+- `src/app/(app)/team/BillingSection.tsx` — the Team page's "Plan & billing" UI: current plan/status, Subscribe/Switch buttons per tier, Cancel subscription
+- `src/app/api/razorpay/webhook` — verifies Razorpay's signed webhook request, then is the only place that writes `subscriptions.status`/`plan_id` and provisions `organizations.plan_validation_quota`/`plan_send_quota`
 
 ## Organizations, invites, and quotas
 
