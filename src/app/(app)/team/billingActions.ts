@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { getCurrentMembership } from "@/lib/organizations";
 import { getRazorpayClient } from "@/lib/razorpay";
-import { getTerm, totalCountForTerm } from "@/lib/pricingPlans";
+import { getTerm, totalCountForTerm, type CurrencyCode, type TermId } from "@/lib/pricingPlans";
 
 const OPEN_STATUSES = ["created", "authenticated", "active", "pending", "halted"];
 
@@ -18,21 +18,25 @@ async function requireAdmin(supabase: ReturnType<typeof createClient>) {
 }
 
 /**
- * Creates a brand-new Razorpay subscription for the given plan + billing
- * term (monthly / 6month / 12month -- each its own Razorpay Plan, see
- * pricingPlans.ts) and redirects to its hosted checkout page (short_url) for
- * the customer to authorize payment. Inserts a tracking row with status
+ * Creates a brand-new Razorpay subscription for the given plan + currency +
+ * billing term (monthly / 6month / 12month -- each its own Razorpay Plan,
+ * see pricingPlans.ts) and redirects to its hosted checkout page (short_url)
+ * for the customer to authorize payment. Inserts a tracking row with status
  * "created" -- no quota is granted yet; that only happens once the webhook
  * confirms activation (see src/app/api/razorpay/webhook/route.ts). Only
  * usable when the org doesn't already have an open subscription -- use
  * changePlan() for an existing one.
  */
-export async function startSubscription(planId: string, termId: string): Promise<void> {
+export async function startSubscription(
+  planId: string,
+  currency: CurrencyCode,
+  termId: TermId,
+): Promise<void> {
   const supabase = createClient();
   const membership = await requireAdmin(supabase);
 
-  const term = getTerm(planId, termId);
-  if (!term) throw new Error("Unknown plan or billing term.");
+  const term = getTerm(planId, currency, termId);
+  if (!term) throw new Error("Unknown plan, currency, or billing term.");
 
   const { data: existing, error: existingError } = await supabase
     .from("subscriptions")
@@ -57,6 +61,7 @@ export async function startSubscription(planId: string, termId: string): Promise
     {
       organization_id: membership.organization_id,
       plan_id: planId,
+      currency,
       term_id: termId,
       razorpay_subscription_id: subscription.id,
       status: subscription.status,
@@ -70,27 +75,40 @@ export async function startSubscription(planId: string, termId: string): Promise
 }
 
 /**
- * Changes an existing active subscription's plan/term immediately. Does NOT
- * write plan_id/term_id/status here -- the subscription.updated webhook is
- * the only place that happens, so the DB never disagrees with what Razorpay
- * actually confirmed. The Team page may show the old plan for a few seconds
- * until that webhook lands.
+ * Changes an existing active subscription's plan/currency/term immediately.
+ * Does NOT write plan_id/currency/term_id/status here -- the
+ * subscription.updated webhook is the only place that happens, so the DB
+ * never disagrees with what Razorpay actually confirmed. The Team page may
+ * show the old plan for a few seconds until that webhook lands.
+ *
+ * Note: Razorpay doesn't support changing a subscription's currency
+ * mid-cycle (it would mean a different payment method/mandate) -- switching
+ * currency requires cancelling and starting a new subscription instead.
  */
-export async function changePlan(planId: string, termId: string): Promise<void> {
+export async function changePlan(
+  planId: string,
+  currency: CurrencyCode,
+  termId: TermId,
+): Promise<void> {
   const supabase = createClient();
   const membership = await requireAdmin(supabase);
 
-  const term = getTerm(planId, termId);
-  if (!term) throw new Error("Unknown plan or billing term.");
+  const term = getTerm(planId, currency, termId);
+  if (!term) throw new Error("Unknown plan, currency, or billing term.");
 
   const { data: existing, error: existingError } = await supabase
     .from("subscriptions")
-    .select("razorpay_subscription_id, status")
+    .select("razorpay_subscription_id, status, currency")
     .eq("organization_id", membership.organization_id)
     .maybeSingle();
   if (existingError) throw existingError;
   if (!existing || existing.status !== "active") {
     throw new Error("No active subscription to change -- subscribe to a plan first.");
+  }
+  if (existing.currency !== currency) {
+    throw new Error(
+      "Can't change currency on an existing subscription -- cancel it and start a new one in the new currency.",
+    );
   }
 
   const razorpay = getRazorpayClient();

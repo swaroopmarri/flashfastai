@@ -27,6 +27,13 @@ const QUOTA_PROVISIONING_EVENTS = new Set([
   "subscription.updated",
 ]);
 
+// "halted" is Razorpay's terminal retry-exhausted state -- it gave up
+// retrying a failed charge (as opposed to "pending", which just means a
+// retry is still in progress this cycle). Without this, an org whose card
+// stopped working would keep its full quota indefinitely, unpaid, until
+// someone noticed and cancelled manually.
+const QUOTA_FREEZE_EVENTS = new Set(["subscription.halted"]);
+
 function toIso(unixSeconds: number | null | undefined): string | null {
   return unixSeconds ? new Date(unixSeconds * 1000).toISOString() : null;
 }
@@ -87,6 +94,14 @@ export async function POST(request: Request) {
       })
       .eq("id", subscriptionRow.organization_id);
     if (quotaError) throw quotaError;
+  }
+
+  if (QUOTA_FREEZE_EVENTS.has(body.event)) {
+    const { error: freezeError } = await supabase
+      .from("organizations")
+      .update({ plan_validation_quota: 0, plan_send_quota: 0 })
+      .eq("id", subscriptionRow.organization_id);
+    if (freezeError) throw freezeError;
   }
 
   return NextResponse.json({ ok: true });

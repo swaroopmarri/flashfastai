@@ -37,6 +37,7 @@ export async function signup(formData: FormData) {
   const lastName = (formData.get("lastName") as string).trim();
   const yearsExperienceRaw = formData.get("yearsExperience") as string;
   const yearsExperience = Number(yearsExperienceRaw);
+  const acceptedTerms = formData.get("acceptedTerms") === "on";
 
   if (!organizationName) {
     redirect(`/login?error=${encodeURIComponent("Organization name is required to sign up.")}`);
@@ -45,6 +46,13 @@ export async function signup(formData: FormData) {
     redirect(
       `/login?error=${encodeURIComponent(
         "First name, last name, and years of experience are all required to sign up.",
+      )}`,
+    );
+  }
+  if (!acceptedTerms) {
+    redirect(
+      `/login?error=${encodeURIComponent(
+        "You must agree to the Terms of Service and Privacy Policy to sign up.",
       )}`,
     );
   }
@@ -66,6 +74,7 @@ export async function signup(formData: FormData) {
         pending_first_name: firstName,
         pending_last_name: lastName,
         pending_years_experience: yearsExperience,
+        pending_terms_accepted_at: new Date().toISOString(),
       },
     },
   });

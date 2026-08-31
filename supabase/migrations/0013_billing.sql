@@ -18,6 +18,10 @@ create table if not exists public.subscriptions (
   -- 12month) -- see BillingTerm in src/lib/pricingPlans.ts. Doesn't affect
   -- quota (that's plan_id only), just billing frequency/amount and display.
   term_id text not null default 'monthly' check (term_id in ('monthly', '6month', '12month')),
+  -- Which currency the customer is billed in -- see CurrencyPricing in
+  -- src/lib/pricingPlans.ts. Doesn't affect quota, just which Razorpay Plan
+  -- (and payment method) this subscription uses.
+  currency text not null default 'INR' check (currency in ('INR', 'USD')),
   razorpay_subscription_id text not null unique,
   status text not null default 'created' check (
     status in ('created', 'authenticated', 'active', 'pending', 'halted', 'cancelled', 'completed', 'expired')

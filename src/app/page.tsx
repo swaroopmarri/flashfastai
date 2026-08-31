@@ -2,8 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { WHATSAPP_HREF } from "@/lib/whatsapp";
-import { PRICING_PLANS } from "@/lib/pricingPlans";
 import { NetworkIllustration } from "./_components/NetworkIllustration";
+import { PricingCards } from "./_components/PricingCards";
 
 const FEATURES = [
   {
@@ -135,78 +135,11 @@ export default async function LandingPage() {
               Every plan includes email verification, unlimited campaigns, My
               Network, and automatic unsubscribe handling.
             </p>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {PRICING_PLANS.map((plan) => {
-                const isPopular = plan.id === "pro";
-                return (
-                  <div
-                    key={plan.id}
-                    className={`relative overflow-hidden rounded-lg border bg-white text-center shadow-sm ${
-                      isPopular ? "border-indigo-400 ring-2 ring-indigo-200" : "border-gray-200"
-                    }`}
-                  >
-                    {isPopular && (
-                      <span className="absolute right-3 top-3 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white">
-                        Most popular
-                      </span>
-                    )}
-                    <div
-                      className={`px-6 py-6 text-white ${
-                        isPopular
-                          ? "bg-gradient-to-r from-indigo-600 to-sky-500"
-                          : "bg-gradient-to-r from-gray-700 to-gray-500"
-                      }`}
-                    >
-                      <p className="text-sm font-medium uppercase tracking-wide opacity-90">
-                        {plan.name}
-                      </p>
-                      <p className="mt-1 text-3xl font-semibold">
-                        ₹{plan.priceInr.toLocaleString("en-IN")}
-                        <span className="text-sm font-normal opacity-80">/mo</span>
-                      </p>
-                      <p className="mt-1 text-xs opacity-90">
-                        Up to {plan.contacts.toLocaleString("en-IN")} contacts
-                      </p>
-                    </div>
-
-                    <div className="p-6">
-                      <ul className="space-y-1.5 text-left text-xs text-gray-700">
-                        <li>✓ Verification included</li>
-                        <li>✓ Unlimited campaigns</li>
-                        <li>✓ My Network</li>
-                        <li>✓ Suppression handling</li>
-                      </ul>
-
-                      <ul className="mt-4 space-y-1 border-t border-gray-100 pt-4 text-left text-xs text-gray-500">
-                        {plan.terms
-                          .filter((t) => t.discountPercent > 0)
-                          .map((t) => (
-                            <li key={t.id}>
-                              Prepay {t.label.toLowerCase()}:{" "}
-                              <span className="font-medium text-gray-700">
-                                ₹{t.totalPriceInr.toLocaleString("en-IN")}
-                              </span>{" "}
-                              <span className="text-emerald-600">
-                                (save {t.discountPercent}%)
-                              </span>
-                            </li>
-                          ))}
-                      </ul>
-
-                      <Link
-                        href="/login"
-                        className="mt-6 block rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-                      >
-                        Get Started
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <PricingCards />
             <p className="mt-8 text-center text-xs text-gray-400">
               Most competitors charge more, and bill email verification as a
               separate add-on. Here, it&apos;s already included in every plan.
+              Indian prices include GST; USD prices exclude local taxes.
             </p>
           </div>
         </section>

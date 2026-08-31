@@ -143,6 +143,26 @@ export function AuthForm() {
               className={inputClass}
             />
           </div>
+          <div className="flex items-start gap-2">
+            <input
+              id="acceptedTerms"
+              name="acceptedTerms"
+              type="checkbox"
+              required
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <label htmlFor="acceptedTerms" className="text-sm text-gray-600">
+              I agree to the{" "}
+              <a href="/terms" target="_blank" className="text-indigo-600 hover:underline">
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a href="/privacy" target="_blank" className="text-indigo-600 hover:underline">
+                Privacy Policy
+              </a>
+              , including the non-refundable prepayment terms.
+            </label>
+          </div>
           <button
             type="submit"
             className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"

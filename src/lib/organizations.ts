@@ -77,6 +77,7 @@ async function ensureProfile(supabase: SupabaseClient, user: User): Promise<void
   const firstName = user.user_metadata?.pending_first_name as string | undefined;
   const lastName = user.user_metadata?.pending_last_name as string | undefined;
   const yearsExperience = user.user_metadata?.pending_years_experience as number | undefined;
+  const termsAcceptedAt = user.user_metadata?.pending_terms_accepted_at as string | undefined;
 
   if (!firstName || !lastName || yearsExperience === undefined) return;
 
@@ -85,6 +86,7 @@ async function ensureProfile(supabase: SupabaseClient, user: User): Promise<void
     first_name: firstName,
     last_name: lastName,
     years_experience: yearsExperience,
+    terms_accepted_at: termsAcceptedAt ?? null,
   });
   if (error) throw error;
 }

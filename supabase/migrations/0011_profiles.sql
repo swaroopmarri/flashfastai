@@ -8,6 +8,7 @@ create table if not exists public.profiles (
   first_name text not null,
   last_name text not null,
   years_experience integer not null check (years_experience >= 0),
+  terms_accepted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

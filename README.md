@@ -51,7 +51,9 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    - `supabase/migrations/0007_suppression.sql` — adds a `reason` column to `unsubscribes` (unsubscribe-link click vs. SES spam complaint), a `resubscribe_log` audit table, and `resubscribe_contact()` for manual resubscribes.
    - `supabase/migrations/0011_profiles.sql` — adds `profiles` (first name, last name, years of experience), collected at signup and editable from `/account`.
    - `supabase/migrations/0012_drop_profile_company.sql` — drops `profiles.current_company`; the org's own name (`organizations.name`) is used instead, so it was a redundant duplicate field.
-   - `supabase/migrations/0013_billing.sql` — adds `subscriptions` (one row per org: Razorpay subscription id, plan, status, current billing cycle dates), written only by the Razorpay webhook (plus an initial placeholder row from `startSubscription()`) — see **Setting up Razorpay billing**.
+   - `supabase/migrations/0013_billing.sql` — adds `subscriptions` (one row per org: Razorpay subscription id, plan, term, currency, status, current billing cycle dates), written only by the Razorpay webhook (plus an initial placeholder row from `startSubscription()`) — see **Setting up Razorpay billing**.
+   - `supabase/migrations/0014_subscription_currency.sql` — idempotent `currency` column add for a `subscriptions` table already created by an earlier version of 0013.sql (harmless no-op if you're running 0013.sql fresh, since it already includes `currency`).
+   - `supabase/migrations/0015_terms_acceptance.sql` — adds `profiles.terms_accepted_at`, set when a user checks the Terms/Privacy acceptance box at signup.
 
 ## Setting up Amazon SES
 
@@ -97,20 +99,22 @@ Real self-service subscriptions (upgrade/downgrade/cancel on the Team page) won'
 
 1. **Create a Razorpay account** at [razorpay.com](https://razorpay.com) if you don't have one, and get it activated for live payments (test mode works for trying this out first).
 2. **Get your API keys**: Dashboard → **Settings → API Keys → Generate Key** → set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`.
-3. **Create 12 Plans** — each of the 4 tiers × 3 prepay terms (monthly, 6 months at 5% off, 12 months at 8% off) is its own Razorpay Plan, since each has a different billing frequency and amount per cycle. Either in the dashboard (**Subscriptions → Plans → Create Plan**) or via the API:
+3. **Create 24 Plans** — each of the 4 tiers × 3 prepay terms (monthly, 6 months at 5% off, 12 months at 8% off) × 2 currencies (INR, USD) is its own Razorpay Plan, since each has a different billing frequency, currency, and amount per cycle. Either in the dashboard (**Subscriptions → Plans → Create Plan**) or via the API:
    - **Monthly** plans: `period: "monthly"`, `interval: 1`.
    - **6-month** plans: `period: "monthly"`, `interval: 6` (charges once every 6 months).
    - **12-month** plans: `period: "yearly"`, `interval: 1` (charges once a year).
-   - Amount is the **total charged per billing cycle**, in **paise** (₹ × 100) -- not a per-month price. Use these exact totals (already computed with the discount applied), matching `src/lib/pricingPlans.ts`:
+   - **INR amounts are GST-inclusive** (18%) — Razorpay charges one fixed amount per cycle with no separate tax line item, so GST has to be baked into the Plan amount itself. `src/lib/pricingPlans.ts` stores the pre-tax price and computes this total via `withGst()`; use the GST-inclusive amount below when creating the Plan (in **paise**, ₹ × 100).
+   - **USD amounts have no GST** (it's an Indian tax) and are priced independently of the INR tiers against the same USD-denominated provider costs — see the comment at the top of `pricingPlans.ts`.
 
-     | Tier | Monthly | 6 months (5% off) | 12 months (8% off) |
-     | --- | --- | --- | --- |
-     | Starter | ₹499 | ₹2,844 | ₹5,509 |
-     | Growth | ₹999 | ₹5,694 | ₹11,029 |
-     | Pro | ₹1,999 | ₹11,394 | ₹22,069 |
-     | Scale | ₹4,999 | ₹28,494 | ₹55,189 |
+     | Tier | INR Monthly (incl. GST) | INR 6mo (incl. GST) | INR 12mo (incl. GST) | USD Monthly | USD 6mo | USD 12mo |
+     | --- | --- | --- | --- | --- | --- | --- |
+     | Starter | ₹589 | ₹3,356 | ₹6,501 | $6.99 | $39.99 | $76.99 |
+     | Growth | ₹1,179 | ₹6,719 | ₹13,014 | $13.99 | $79.99 | $154.99 |
+     | Pro | ₹2,359 | ₹13,445 | ₹26,041 | $27.99 | $159.99 | $308.99 |
+     | Scale | ₹5,899 | ₹33,623 | ₹65,123 | $69.99 | $398.99 | $772.99 |
 
-   - Copy each resulting Plan ID (e.g. `plan_ABC123`) into the matching `razorpayPlanId` field inside that tier's `terms` array in `src/lib/pricingPlans.ts`, replacing the `REPLACE_WITH_..._RAZORPAY_PLAN_ID` placeholders (12 total). Subscriptions for a given plan+term can't be created until its placeholder is replaced.
+   - Copy each resulting Plan ID (e.g. `plan_ABC123`) into the matching `razorpayPlanId` field inside that tier's `currencies[INR|USD].terms` array in `src/lib/pricingPlans.ts`, replacing the `REPLACE_WITH_..._RAZORPAY_PLAN_ID` placeholders (24 total). Subscriptions for a given plan+currency+term can't be created until its placeholder is replaced.
+   - **Accepting USD requires Razorpay's international payments feature to be enabled on your account first** — this is a separate account-level approval (additional KYC, subject to RBI/FEMA rules for an India-based merchant), not just a code or dashboard-config change. Confirm that's active before relying on the USD Plans; until then, leave customers on INR.
 4. **Create a webhook**: Dashboard → **Settings → Webhooks → Add New Webhook**:
    - **URL**: `https://<your-app-domain>/api/razorpay/webhook`
    - **Secret**: any value you choose — set it as `RAZORPAY_WEBHOOK_SECRET` too (must match exactly).
@@ -119,13 +123,15 @@ Real self-service subscriptions (upgrade/downgrade/cancel on the Team page) won'
 
 **How quota provisioning actually works** (why this is safe against a spoofed or replayed "payment succeeded" client request): the webhook is the *only* place `organizations.plan_validation_quota`/`plan_send_quota` and `subscriptions.status`/`plan_id` ever get written after the initial subscribe. `startSubscription()` only creates a Razorpay subscription and a placeholder DB row (status `created`, no quota granted); `changePlan()`/`cancelSubscription()` only call the Razorpay API. None of them trust anything the browser reports back — every actual state change comes from `src/app/api/razorpay/webhook/route.ts` verifying Razorpay's own signed request first.
 
-**Upgrade/downgrade**, once a subscription is active, calls Razorpay's `subscriptions.update()` with `schedule_change_at: "now"` — takes effect immediately (no proration logic beyond whatever Razorpay itself applies). There's no "pause and resume mid-cycle" refinement here; that's a reasonable future improvement if needed.
+**Upgrade/downgrade**, once a subscription is active, calls Razorpay's `subscriptions.update()` with `schedule_change_at: "now"` — takes effect immediately (no proration logic beyond whatever Razorpay itself applies). There's no "pause and resume mid-cycle" refinement here; that's a reasonable future improvement if needed. Currency can't be changed on an existing subscription (a different currency means a different payment method/mandate) — the customer has to cancel and start a new subscription in the new currency.
+
+**On payment failure**, the webhook freezes the org's quota to zero the moment Razorpay reports `subscription.halted` (its terminal "gave up retrying" state, as opposed to `pending`, which just means a retry is still in progress this cycle) — see `QUOTA_FREEZE_EVENTS` in the webhook route. This closes a real gap that existed before: without it, an org whose card stopped working could keep using its full quota indefinitely, unpaid, until someone noticed and cancelled manually. Quota resumes automatically, with no extra code, the moment a later `subscription.activated`/`charged` event reports a successful charge again.
 
 **On cancellation**, the org's quota is left as-is rather than reset to some "free tier" — there isn't one defined anywhere in this app (every org's quota otherwise defaults to a flat 10,000/10,000 from migrations 0002/0003, which is actually more generous than any paid tier). If you want cancellation to actually reduce quota, that policy needs to be decided and added to the webhook handler's `subscription.cancelled` case.
 
 ## Structure
 
-- `src/app/login` — email/password login + signup form (Server Actions in `actions.ts`)
+- `src/app/login` — email/password login + signup form (Server Actions in `actions.ts`); signup requires checking a Terms of Service/Privacy Policy acceptance box, recorded as `profiles.terms_accepted_at`
 - `src/app/dashboard` — protected page; redirects to `/login` if not authenticated, has a logout button
 - `src/app/auth/callback` — exchanges Supabase's email-confirmation `code` for a session
 - `src/app/contacts` — contact list overview, CSV/Excel upload & merge (`UploadForm.tsx`), per-list detail page with a "Verify Contacts" button (`[listId]/VerifyPanel.tsx`)
