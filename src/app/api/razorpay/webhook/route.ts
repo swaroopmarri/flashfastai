@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import { createAdminClient } from "@/utils/supabase/admin";
-import { getPlanByRazorpayPlanId } from "@/lib/pricingPlans";
+import { getPlanAndTermByRazorpayPlanId } from "@/lib/pricingPlans";
 
 interface RazorpaySubscriptionEntity {
   id: string;
@@ -63,13 +63,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const plan = getPlanByRazorpayPlanId(entity.plan_id);
+  const match = getPlanAndTermByRazorpayPlanId(entity.plan_id);
 
   const { error: updateError } = await supabase
     .from("subscriptions")
     .update({
       status: entity.status,
-      plan_id: plan?.id,
+      plan_id: match?.plan.id,
+      term_id: match?.term.id,
       current_start: toIso(entity.current_start),
       current_end: toIso(entity.current_end),
       updated_at: new Date().toISOString(),
@@ -77,12 +78,12 @@ export async function POST(request: Request) {
     .eq("id", subscriptionRow.id);
   if (updateError) throw updateError;
 
-  if (QUOTA_PROVISIONING_EVENTS.has(body.event) && plan) {
+  if (QUOTA_PROVISIONING_EVENTS.has(body.event) && match) {
     const { error: quotaError } = await supabase
       .from("organizations")
       .update({
-        plan_validation_quota: plan.contacts,
-        plan_send_quota: plan.contacts,
+        plan_validation_quota: match.plan.contacts,
+        plan_send_quota: match.plan.contacts,
       })
       .eq("id", subscriptionRow.organization_id);
     if (quotaError) throw quotaError;

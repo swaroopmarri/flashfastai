@@ -14,6 +14,10 @@ create table if not exists public.subscriptions (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   plan_id text not null check (plan_id in ('starter', 'growth', 'pro', 'scale')),
+  -- Which prepay term the plan was subscribed under (monthly / 6month /
+  -- 12month) -- see BillingTerm in src/lib/pricingPlans.ts. Doesn't affect
+  -- quota (that's plan_id only), just billing frequency/amount and display.
+  term_id text not null default 'monthly' check (term_id in ('monthly', '6month', '12month')),
   razorpay_subscription_id text not null unique,
   status text not null default 'created' check (
     status in ('created', 'authenticated', 'active', 'pending', 'halted', 'cancelled', 'completed', 'expired')

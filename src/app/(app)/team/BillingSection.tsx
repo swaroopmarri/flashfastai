@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { PRICING_PLANS } from "@/lib/pricingPlans";
+import { PRICING_PLANS, getTerm } from "@/lib/pricingPlans";
 import { startSubscription, changePlan, cancelSubscription } from "./billingActions";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -15,13 +15,22 @@ const STATUS_LABELS: Record<string, string> = {
   expired: "Expired",
 };
 
+const TERM_OPTIONS = [
+  { id: "monthly", label: "Monthly" },
+  { id: "6month", label: "6 months (5% off)" },
+  { id: "12month", label: "12 months (8% off)" },
+];
+
 export function BillingSection({
   currentPlanId,
+  currentTermId,
   status,
 }: {
   currentPlanId: string | null;
+  currentTermId: string | null;
   status: string | null;
 }) {
+  const [selectedTermId, setSelectedTermId] = useState("monthly");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -48,7 +57,9 @@ export function BillingSection({
         Current plan:{" "}
         <span className="font-medium">
           {currentPlanId
-            ? PRICING_PLANS.find((p) => p.id === currentPlanId)?.name ?? currentPlanId
+            ? `${PRICING_PLANS.find((p) => p.id === currentPlanId)?.name ?? currentPlanId}${
+                currentTermId ? ` -- ${TERM_OPTIONS.find((t) => t.id === currentTermId)?.label ?? currentTermId}` : ""
+              }`
             : "None -- subscribe to a plan below"}
         </span>
         {status && (
@@ -61,15 +72,37 @@ export function BillingSection({
         <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{notice}</p>
       )}
 
+      <div>
+        <p className="mb-1.5 text-xs font-medium text-gray-500">Billing term (for Subscribe/Switch below)</p>
+        <div className="flex gap-2">
+          {TERM_OPTIONS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setSelectedTermId(t.id)}
+              className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
+                selectedTermId === t.id
+                  ? "border-indigo-400 bg-indigo-50 text-indigo-700"
+                  : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {PRICING_PLANS.map((plan) => {
-          const isCurrent = isActive && plan.id === currentPlanId;
+          const term = getTerm(plan.id, selectedTermId);
+          const isCurrent = isActive && plan.id === currentPlanId && selectedTermId === currentTermId;
 
           return (
             <div key={plan.id} className="rounded-md border border-gray-200 p-3 text-center">
               <p className="text-sm font-medium text-gray-900">{plan.name}</p>
               <p className="text-xs text-gray-500">
-                ₹{plan.priceInr.toLocaleString("en-IN")}/mo
+                ₹{term?.totalPriceInr.toLocaleString("en-IN")}
+                {term && term.months > 1 ? ` / ${term.months}mo` : "/mo"}
               </p>
 
               {isCurrent ? (
@@ -83,7 +116,7 @@ export function BillingSection({
                   title={!isActive ? "Wait for the current subscription to finish activating" : undefined}
                   onClick={() =>
                     runAction(
-                      () => changePlan(plan.id),
+                      () => changePlan(plan.id, selectedTermId),
                       "Change requested -- this updates within a few seconds once Razorpay confirms.",
                     )
                   }
@@ -92,7 +125,7 @@ export function BillingSection({
                   Switch
                 </button>
               ) : (
-                <form action={startSubscription.bind(null, plan.id)}>
+                <form action={startSubscription.bind(null, plan.id, selectedTermId)}>
                   <button
                     type="submit"
                     className="mt-2 w-full rounded-md bg-indigo-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"

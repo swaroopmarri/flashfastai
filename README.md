@@ -97,9 +97,20 @@ Real self-service subscriptions (upgrade/downgrade/cancel on the Team page) won'
 
 1. **Create a Razorpay account** at [razorpay.com](https://razorpay.com) if you don't have one, and get it activated for live payments (test mode works for trying this out first).
 2. **Get your API keys**: Dashboard → **Settings → API Keys → Generate Key** → set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`.
-3. **Create four Plans** (one per pricing tier), either in the dashboard (**Subscriptions → Plans → Create Plan**) or via the API:
-   - Each Plan needs `period: "monthly"`, `interval: 1`, and an `item` with the tier's price in **paise** (e.g. ₹499/mo → `amount: 49900`) — match the prices in `src/lib/pricingPlans.ts` (Starter ₹499, Growth ₹999, Pro ₹1,999, Scale ₹4,999).
-   - Copy each resulting Plan ID (e.g. `plan_ABC123`) into the matching `razorpayPlanId` field in `src/lib/pricingPlans.ts`, replacing the `REPLACE_WITH_..._RAZORPAY_PLAN_ID` placeholders. Subscriptions can't be created until this is done.
+3. **Create 12 Plans** — each of the 4 tiers × 3 prepay terms (monthly, 6 months at 5% off, 12 months at 8% off) is its own Razorpay Plan, since each has a different billing frequency and amount per cycle. Either in the dashboard (**Subscriptions → Plans → Create Plan**) or via the API:
+   - **Monthly** plans: `period: "monthly"`, `interval: 1`.
+   - **6-month** plans: `period: "monthly"`, `interval: 6` (charges once every 6 months).
+   - **12-month** plans: `period: "yearly"`, `interval: 1` (charges once a year).
+   - Amount is the **total charged per billing cycle**, in **paise** (₹ × 100) -- not a per-month price. Use these exact totals (already computed with the discount applied), matching `src/lib/pricingPlans.ts`:
+
+     | Tier | Monthly | 6 months (5% off) | 12 months (8% off) |
+     | --- | --- | --- | --- |
+     | Starter | ₹499 | ₹2,844 | ₹5,509 |
+     | Growth | ₹999 | ₹5,694 | ₹11,029 |
+     | Pro | ₹1,999 | ₹11,394 | ₹22,069 |
+     | Scale | ₹4,999 | ₹28,494 | ₹55,189 |
+
+   - Copy each resulting Plan ID (e.g. `plan_ABC123`) into the matching `razorpayPlanId` field inside that tier's `terms` array in `src/lib/pricingPlans.ts`, replacing the `REPLACE_WITH_..._RAZORPAY_PLAN_ID` placeholders (12 total). Subscriptions for a given plan+term can't be created until its placeholder is replaced.
 4. **Create a webhook**: Dashboard → **Settings → Webhooks → Add New Webhook**:
    - **URL**: `https://<your-app-domain>/api/razorpay/webhook`
    - **Secret**: any value you choose — set it as `RAZORPAY_WEBHOOK_SECRET` too (must match exactly).

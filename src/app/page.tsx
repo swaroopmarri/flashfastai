@@ -177,6 +177,22 @@ export default async function LandingPage() {
                         <li>✓ Suppression handling</li>
                       </ul>
 
+                      <ul className="mt-4 space-y-1 border-t border-gray-100 pt-4 text-left text-xs text-gray-500">
+                        {plan.terms
+                          .filter((t) => t.discountPercent > 0)
+                          .map((t) => (
+                            <li key={t.id}>
+                              Prepay {t.label.toLowerCase()}:{" "}
+                              <span className="font-medium text-gray-700">
+                                ₹{t.totalPriceInr.toLocaleString("en-IN")}
+                              </span>{" "}
+                              <span className="text-emerald-600">
+                                (save {t.discountPercent}%)
+                              </span>
+                            </li>
+                          ))}
+                      </ul>
+
                       <Link
                         href="/login"
                         className="mt-6 block rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"

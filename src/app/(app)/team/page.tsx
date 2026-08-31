@@ -43,7 +43,7 @@ export default async function TeamPage() {
 
   const { data: subscription, error: subscriptionError } = await supabase
     .from("subscriptions")
-    .select("plan_id, status")
+    .select("plan_id, term_id, status")
     .eq("organization_id", membership.organization_id)
     .maybeSingle();
   if (subscriptionError && !isMissingSchemaError(subscriptionError)) throw subscriptionError;
@@ -94,6 +94,7 @@ export default async function TeamPage() {
         <h2 className="mb-3 text-lg font-medium text-gray-900">Plan &amp; billing</h2>
         <BillingSection
           currentPlanId={subscription?.plan_id ?? null}
+          currentTermId={subscription?.term_id ?? null}
           status={subscription?.status ?? null}
         />
       </div>
