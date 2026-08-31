@@ -5,8 +5,13 @@ import {
   getBulkFileStatus,
   getBulkFileResult,
   type SimplifiedStatus,
-} from "@/lib/zerobounce";
+} from "@/lib/millionverifier";
 import { getCurrentMembership } from "@/lib/organizations";
+
+// NOTE: the `contacts.zerobounce_sub_status` / `verification_jobs.zerobounce_file_id`
+// DB column names predate the switch to MillionVerifier and are kept as-is
+// (a rename is a larger, purely cosmetic migration) -- they now hold
+// MillionVerifier's data, not ZeroBounce's.
 
 const BULK_THRESHOLD = 50;
 
@@ -81,7 +86,7 @@ async function fetchPendingEmails(
   if (error) throw error;
 
   // Company scope can return the same email more than once (present in
-  // multiple lists) -- dedupe so we don't pay quota or call ZeroBounce
+  // multiple lists) -- dedupe so we don't pay quota or call MillionVerifier
   // twice for one address.
   return Array.from(
     new Set((data ?? []).map((c) => (c.email as string).trim().toLowerCase())),
@@ -224,10 +229,10 @@ export async function pollVerificationJob(
   if (zbStatus === "Failed") {
     await supabase
       .from("verification_jobs")
-      .update({ status: "failed", error_message: errorReason || "ZeroBounce reported a failure" })
+      .update({ status: "failed", error_message: errorReason || "MillionVerifier reported a failure" })
       .eq("id", jobId);
     job.status = "failed";
-    job.error_message = errorReason || "ZeroBounce reported a failure";
+    job.error_message = errorReason || "MillionVerifier reported a failure";
     return toResult();
   }
 

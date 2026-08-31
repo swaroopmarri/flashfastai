@@ -125,7 +125,7 @@ export function VerifyPanel({
       {state.phase === "polling" && (
         <p className="mt-3 flex items-center gap-2 text-sm text-indigo-700">
           <span className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-700" />
-          Verifying against ZeroBounce — larger batches can take a few minutes.
+          Verifying against MillionVerifier — larger batches can take a few minutes.
           You can leave this page and come back; verification continues in the
           background.
         </p>

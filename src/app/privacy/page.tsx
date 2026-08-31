@@ -51,7 +51,7 @@ export default function PrivacyPage() {
           <p>We use this data only to run the Service for you, specifically to:</p>
           <ul className="mt-1 list-disc space-y-1 pl-5">
             <li>Authenticate you and keep your organization&apos;s data separate from every other customer&apos;s</li>
-            <li>Send the email addresses you upload to our verification provider (ZeroBounce) to check deliverability</li>
+            <li>Send the email addresses you upload to our verification provider (MillionVerifier) to check deliverability</li>
             <li>Send the campaign emails you compose, through our sending provider (Amazon SES), to the recipients you choose</li>
             <li>Enforce unsubscribe requests and suppress those addresses from future sends</li>
             <li>Enforce your plan&apos;s monthly quota</li>
@@ -80,7 +80,7 @@ export default function PrivacyPage() {
           <p>We rely on a small number of providers to operate the Service:</p>
           <ul className="mt-1 list-disc space-y-1 pl-5">
             <li><strong>Supabase</strong> — hosts our database and handles authentication</li>
-            <li><strong>ZeroBounce</strong> — receives the email addresses you submit for verification</li>
+            <li><strong>MillionVerifier</strong> — receives the email addresses you submit for verification</li>
             <li><strong>Amazon SES</strong> — sends the campaign emails you compose, and reports back bounces/complaints</li>
             <li><strong>Vercel</strong> — hosts the application itself</li>
           </ul>

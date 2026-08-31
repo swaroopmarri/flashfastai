@@ -1,4 +1,4 @@
-This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase email/password authentication, multi-tenant organizations with per-member quotas, contact list management with ZeroBounce email verification, and a campaign builder that composes and sends email through Amazon SES.
+This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase email/password authentication, multi-tenant organizations with per-member quotas, contact list management with MillionVerifier email verification, and a campaign builder that composes and sends email through Amazon SES.
 
 ## Getting Started
 
@@ -20,7 +20,7 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    | --- | --- |
    | `NEXT_PUBLIC_SUPABASE_URL` | Supabase dashboard → Project Settings → Data API (or "API") → **Project URL** |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Same page → API Keys → **anon / public** key |
-   | `ZEROBOUNCE_API_KEY` | [ZeroBounce dashboard → API Settings](https://www.zerobounce.net/members/apikeys/) |
+   | `MILLIONVERIFIER_API_KEY` | [MillionVerifier dashboard → API](https://app.millionverifier.com/api) |
    | `SUPABASE_SERVICE_ROLE_KEY` | Same Supabase API page → **service_role** secret key |
    | `CRON_SECRET` | Any long random string you generate (e.g. `openssl rand -hex 32`) |
    | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | An IAM user scoped to SES — see **Setting up Amazon SES** below |
@@ -31,7 +31,7 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    | `RAZORPAY_WEBHOOK_SECRET` | The secret you set when creating the Razorpay webhook — see **Setting up Razorpay billing** |
 
    The two `NEXT_PUBLIC_` values are safe to expose in the browser — they're scoped by Supabase Row Level Security, not secrets. The rest are server-only and must never be prefixed with `NEXT_PUBLIC_`:
-   - `ZEROBOUNCE_API_KEY` is only read in Server Actions / Route Handlers.
+   - `MILLIONVERIFIER_API_KEY` is only read in Server Actions / Route Handlers.
    - `SUPABASE_SERVICE_ROLE_KEY` is **extremely sensitive** — it bypasses every RLS policy in the database. It's used in exactly one place (`src/utils/supabase/admin.ts`), imported only by the cron quota-reset route and the SES notifications webhook (both act outside any one user's session, so they can't go through the normal RLS-scoped client). Do not reuse it anywhere else.
    - `CRON_SECRET` protects `/api/cron/reset-quotas` from being invoked by anyone else. Vercel automatically sends it as a Bearer token when it triggers the cron job, once the same value is set in your Vercel project.
    - `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are only read in `src/lib/ses.ts`, called from Server Actions and the send-job poll route — never bundled to the client.
@@ -82,12 +82,12 @@ Sends to unverified addresses while still in sandbox mode fail per-recipient wit
 
 ### Setting up SES bounce and complaint feedback (optional)
 
-Everything else in this app works without this — sending, verification, unsubscribe links, and the Bounced/Undeliverable and Unsubscribed groups on the Suppression List page all work regardless. This step only wires up the third group, **Spam complaints**, plus real post-send bounce detection (as opposed to ZeroBounce's pre-send prediction). Skip it and that group just stays empty.
+Everything else in this app works without this — sending, verification, unsubscribe links, and the Bounced/Undeliverable and Unsubscribed groups on the Suppression List page all work regardless. This step only wires up the third group, **Spam complaints**, plus real post-send bounce detection (as opposed to MillionVerifier's pre-send prediction). Skip it and that group just stays empty.
 
 1. **Create an SNS topic** (any region — doesn't need to match `AWS_REGION`, though same-region is simplest): SNS console → **Topics → Create topic** (Standard type is fine).
 2. **Subscribe your webhook to it**: on that topic → **Create subscription** → protocol **HTTPS** → endpoint `https://<your-app-domain>/api/ses/notifications?secret=<SES_NOTIFICATIONS_SECRET>` (the same value you set for that env var). SNS immediately POSTs a subscription-confirmation handshake to that URL, which the route handles automatically — no separate confirmation click needed, but check the subscription shows **Confirmed** in the SNS console after a few seconds.
 3. **Point SES at that topic**: SES console → **Verified identities** → your domain/address → **Notifications** tab → set both **Bounce feedback** and **Complaint feedback** to the SNS topic you just created.
-4. That's it — real bounces and complaints on future sends now flow into the Suppression List page automatically. Nothing needs to change on the ZeroBounce/verification side.
+4. That's it — real bounces and complaints on future sends now flow into the Suppression List page automatically. Nothing needs to change on the MillionVerifier/verification side.
 
 This endpoint is protected by the `secret` query param, not full SNS message-signature verification — sufficient to stop opportunistic abuse of a discovered URL, but not as strong as cryptographically verifying every request came from AWS. If you want that stronger guarantee, `src/app/api/ses/notifications/route.ts` is where to add it.
 
@@ -134,11 +134,11 @@ Real self-service subscriptions (upgrade/downgrade/cancel on the Team page) won'
 - `src/app/(app)/account` — edit profile (first/last name, years of experience) and request an office email change; `src/lib/officeEmail.ts` blocks personal-provider domains (Gmail, Yahoo, Outlook.com, etc.) both here and at signup
 - `src/app/invite/[token]` — public invite-acceptance page; sets a password and joins the inviting org
 - `src/app/unsubscribe/[token]` — public, unauthenticated page a recipient lands on from the unsubscribe link in a campaign email
-- `src/app/api/verification-jobs/[jobId]` — polling endpoint the browser calls while a bulk ZeroBounce verification job runs in the background
+- `src/app/api/verification-jobs/[jobId]` — polling endpoint the browser calls while a bulk MillionVerifier verification job runs in the background
 - `src/app/api/send-jobs/[jobId]` — polling + processing endpoint for campaign sends; each poll sends one batch of pending recipients via SES
 - `src/app/api/cron/reset-quotas` — called by Vercel Cron (see `vercel.json`) to reset monthly usage; protected by `CRON_SECRET`
-- `src/lib/zerobounce.ts` — ZeroBounce API client (single-email `validate` and the bulk `sendfile` / `filestatus` / `getfile` flow) and status mapping
-- `src/lib/verification.ts` — verification business logic shared by the "start verification" action and the poll route; checks/consumes quota before calling ZeroBounce
+- `src/lib/millionverifier.ts` — MillionVerifier API client (single-email real-time endpoint and the bulk `upload` / `fileinfo` / `download` flow) and quality mapping; replaced the earlier ZeroBounce integration. Note: `contacts.zerobounce_sub_status` and `verification_jobs.zerobounce_file_id` keep their original column names (a rename is a separate, purely cosmetic migration) but now hold MillionVerifier's data.
+- `src/lib/verification.ts` — verification business logic shared by the "start verification" action and the poll route; checks/consumes quota before calling MillionVerifier
 - `src/lib/ses.ts` — thin Amazon SES client wrapper (`sendCampaignEmail`)
 - `src/lib/campaignSend.ts` — campaign-send business logic: builds the recipient list (audience filter minus unsubscribes), checks/consumes send quota, and processes send jobs in batches
 - `src/lib/parseContactsFile.ts` — client-side CSV/Excel parsing (Papa Parse / SheetJS), detects email/name/company columns by header name
@@ -177,10 +177,10 @@ Real self-service subscriptions (upgrade/downgrade/cancel on the Team page) won'
 `/contacts` shows one card per list (name, created date, total count, a status-count badge row, and a headline "X% deliverable") rather than every contact — status counts come from a single grouped-aggregate query (`get_contact_list_status_counts()`), not by pulling every row to the client, so it stays fast for large lists. Each card has **Open list** (the detail page below, with the full per-contact table, grouping, and Verify Contacts) and **Download CSV** (exports every contact in that list with full detail: email, name, company, status, zerobounce_sub_status, verified_at).
 
 1. On the contact list detail page, contacts start out `pending_verification` after upload.
-2. Clicking **Verify Contacts** calls ZeroBounce:
-   - **≤ 50 pending contacts**: calls ZeroBounce's single-email `validate` endpoint concurrently (bounded concurrency) and updates statuses immediately.
-   - **> 50 pending contacts**: submits the list to ZeroBounce's bulk endpoint, which processes asynchronously. A `verification_jobs` row tracks progress; the browser polls `/api/verification-jobs/[jobId]` every few seconds until ZeroBounce reports the file complete, then downloads and applies the results. You can navigate away and come back — the job keeps running server-side and the page resumes polling on reload.
-3. ZeroBounce's status is mapped to three simplified statuses: `valid` → `deliverable`, `invalid` → `undeliverable`, everything else (`catch-all`, `unknown`, `spamtrap`, `abuse`, `do_not_mail`) → `risky`.
+2. Clicking **Verify Contacts** calls MillionVerifier:
+   - **≤ 50 pending contacts**: calls MillionVerifier's real-time single-email endpoint concurrently (bounded concurrency) and updates statuses immediately.
+   - **> 50 pending contacts**: submits the list to MillionVerifier's bulk endpoint, which processes asynchronously. A `verification_jobs` row tracks progress; the browser polls `/api/verification-jobs/[jobId]` every few seconds until MillionVerifier reports the file finished, then downloads and applies the results. You can navigate away and come back — the job keeps running server-side and the page resumes polling on reload.
+3. MillionVerifier's `quality` field is mapped to three simplified statuses: `good` → `deliverable`, `bad` → `undeliverable`, everything else (`risky`, `unknown`, or unrecognized) → `risky`.
 4. In a campaign's Audience step, only `deliverable` contacts are targeted by default; there's a checkbox to also include `risky` contacts.
 
 ## How campaign sending works
@@ -188,7 +188,7 @@ Real self-service subscriptions (upgrade/downgrade/cancel on the Team page) won'
 1. **Compose** (`/campaigns/[id]/compose`): plain-text subject + body with a live preview, and an optional Reply-To override (defaults to the sending user's own account email). The body is auto-converted to a simple HTML version (paragraphs from blank lines) alongside the plain-text version — no rich text editor, kept intentionally simple.
 2. **Audience at send time**: the recipient list is recomputed fresh from the Audience step's filter (`deliverable`, plus `risky` if checked) minus anyone in that user's `unsubscribes` table — so a contact who unsubscribed after being added to a list is still excluded even though their `contacts.status` elsewhere still says `deliverable`.
 3. **Quota**: before sending, `try_consume_quota('send', recipientCount)` runs the same atomic member+org check as verification. Blocked with a clear message if either limit is hit, or if the membership isn't active yet.
-4. **Sending**: a `send_jobs` row tracks the job; a `campaign_recipients` row is created per recipient with its own unique unsubscribe token. The browser polls `/api/send-jobs/[jobId]`, and each poll sends one small batch (10 recipients) via SES — this keeps every request short regardless of list size and avoids serverless timeouts, the same pattern bulk ZeroBounce verification already uses. You can navigate away and come back; the job resumes.
+4. **Sending**: a `send_jobs` row tracks the job; a `campaign_recipients` row is created per recipient with its own unique unsubscribe token. The browser polls `/api/send-jobs/[jobId]`, and each poll sends one small batch (10 recipients) via SES — this keeps every request short regardless of list size and avoids serverless timeouts, the same pattern bulk MillionVerifier verification already uses. You can navigate away and come back; the job resumes.
 5. **Per-recipient failures** (e.g. an unverified address while SES is in sandbox mode) are caught individually — one failure never aborts the batch — and stored with SES's actual error message, shown in a table under the send summary once the job completes.
 6. **Unsubscribe**: every email includes an unsubscribe link unique to that send. Clicking it (no login required) inserts into `unsubscribes` for that sender, marks every matching contact across all of that sender's lists as `unsubscribed`, and is checked at the start of every future send — not optional, not per-list.
 7. Once every recipient has been processed, the campaign's status flips to `sent` (or stays viewable mid-send as `sending`).
@@ -197,11 +197,11 @@ Real self-service subscriptions (upgrade/downgrade/cancel on the Team page) won'
 
 - Every contact across every list you own is grouped by email domain (`swiftit-solutions.com`, etc.), deduplicated by lowercased/trimmed email — the same email in three different lists counts once.
 - When copies disagree (e.g. verified in one list, still pending in another, uploaded a second time with a different name), a "best" row is picked: a non-`pending_verification` status wins over pending, then the most recently verified/created copy — the overview cards and the company detail page always agree on this.
-- Both **verification** and **campaigns** now support two audience scopes, not just one list: `verification_jobs` and `campaigns` can have either a `contact_list_id` (unchanged, single-list behavior) or a `company_domain` (spans every list). Same job/send machinery either way — "Verify all unverified" on a company page runs the identical single/bulk ZeroBounce flow as the per-list Verify Contacts button, just querying by email domain instead of one `contact_list_id`, and updates every matching row across every list so copies stay in sync. "Start campaign with this company" creates a `company_domain`-scoped campaign and drops you at its Audience step, defaulting to deliverable-only.
+- Both **verification** and **campaigns** now support two audience scopes, not just one list: `verification_jobs` and `campaigns` can have either a `contact_list_id` (unchanged, single-list behavior) or a `company_domain` (spans every list). Same job/send machinery either way — "Verify all unverified" on a company page runs the identical single/bulk MillionVerifier flow as the per-list Verify Contacts button, just querying by email domain instead of one `contact_list_id`, and updates every matching row across every list so copies stay in sync. "Start campaign with this company" creates a `company_domain`-scoped campaign and drops you at its Audience step, defaulting to deliverable-only.
 
 ## How the Suppression List works
 
-- **Three groups, three sources**: Bounced/Undeliverable (red, grouped by `zerobounce_sub_status`) comes straight from `contacts.status = 'undeliverable'` — either ZeroBounce's pre-send prediction, or (labeled `ses_<subtype>`) a real permanent bounce reported after an actual send. Unsubscribed (grey) and Spam complaints (orange) are both rows in `unsubscribes`, distinguished by its `reason` column (`'unsubscribe_link'` vs. `'complaint'`) — same table, same enforcement path, just a different cause.
+- **Three groups, three sources**: Bounced/Undeliverable (red, grouped by `zerobounce_sub_status`) comes straight from `contacts.status = 'undeliverable'` — either MillionVerifier's pre-send prediction, or (labeled `ses_<subtype>`) a real permanent bounce reported after an actual send. Unsubscribed (grey) and Spam complaints (orange) are both rows in `unsubscribes`, distinguished by its `reason` column (`'unsubscribe_link'` vs. `'complaint'`) — same table, same enforcement path, just a different cause.
 - **Complaints reuse the unsubscribe path on purpose.** `applyComplaint()` in `src/lib/sesFeedback.ts` inserts into `unsubscribes` exactly the way `unsubscribe_by_token()` already does, just tagged `reason: 'complaint'`. That means every place that already excludes unsubscribes from a send — the Audience step's counts, `campaignSend.ts`'s recipient query, the `contacts.status` filter — excludes complaints too, automatically, with no separate code path to keep in sync or forget.
 - **Re-import protection**: `createContactList` and `mergeContacts` (`src/app/(app)/contacts/actions.ts`) check every uploaded email against the user's `unsubscribes` table before inserting. A suppressed email is never inserted as `pending_verification` — new lists skip it entirely, and merges into an existing list leave that contact's row (and its `unsubscribed` status) untouched. The upload preview shows a count of how many rows were excluded this way, checked via a `checkSuppressedEmails` Server Action right after parsing — informational only; the real enforcement happens again, server-side, in the two actions regardless of what the client saw.
 - **Manual resubscribe** goes through `resubscribe_contact()` (migration 0007), not a plain client-side delete: it deletes the `unsubscribes` row, reverts every matching contact back to `pending_verification` (never straight back to `deliverable` — it has to be re-verified before it can be mailed again), and writes a `resubscribe_log` row (who, when, and what was reversed) — all in one transaction. The UI requires an explicit "Are you sure?" confirmation naming the original opt-out date before calling it.
@@ -215,4 +215,4 @@ The `xlsx` (SheetJS) package on the npm registry has [known unpatched CVEs](http
 
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Supabase Auth with Next.js (SSR)](https://supabase.com/docs/guides/auth/server-side/nextjs)
-- [ZeroBounce API docs](https://www.zerobounce.net/docs/)
+- [MillionVerifier API docs](https://developer.millionverifier.com/)

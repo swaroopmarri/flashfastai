@@ -70,7 +70,7 @@ export default function TermsPage() {
           </h2>
           <p>
             Email verification is performed by a third-party provider
-            (currently ZeroBounce) against the addresses you upload.
+            (currently MillionVerifier) against the addresses you upload.
             Verification results (deliverable, risky, undeliverable) are
             estimates based on that provider&apos;s data and methodology —
             we don&apos;t guarantee a &quot;deliverable&quot; result means an

@@ -6,16 +6,12 @@
  *
  * These contact numbers are sized for 50%+ gross margin against
  * MillionVerifier's 1M-credit plan (~₹0.043/verification) plus AWS SES
- * sending (~₹0.01/email) and a small per-customer overhead allowance --
- * NOT against ZeroBounce, which is what the app actually calls today
- * (src/lib/zerobounce.ts). MillionVerifier is NOT integrated yet.
- *
- * This is a deliberate, display-only choice for the contact numbers: they
- * are marketing copy, not automatically enforced by the verification
- * provider. Before a real customer could actually be provisioned at these
- * contact volumes, MillionVerifier needs to be integrated for real --
- * otherwise fulfilling these numbers against ZeroBounce's real (higher) cost
- * would run at a loss, not a 50%+ margin.
+ * sending (~₹0.01/email) and a small per-customer overhead allowance.
+ * MillionVerifier IS the actual integrated verification provider
+ * (src/lib/millionverifier.ts, replacing the earlier ZeroBounce
+ * integration) -- so unlike when this comment was first written, this
+ * margin assumption now matches the real cost basis, not a hoped-for
+ * future one.
  *
  * Each plan offers 3 prepay terms -- monthly (no discount), 6 months (5%
  * off), 12 months (8% off) -- to push customers toward prepaying for better
