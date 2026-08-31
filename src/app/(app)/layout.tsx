@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { getCurrentMembership, finalizeSignup } from "@/lib/organizations";
+import { isPlatformOwner } from "@/lib/ownerAccess";
 import { logout } from "./dashboard/actions";
 import { NavLink } from "./NavLink";
 import { WhatsAppButton } from "./_components/WhatsAppButton";
@@ -44,6 +45,7 @@ export default async function AppLayout({
               <NavLink href="/campaigns">Campaigns</NavLink>
               <NavLink href="/suppression">Suppression List</NavLink>
               {membership?.role === "admin" && <NavLink href="/team">Team</NavLink>}
+              {isPlatformOwner(user.email) && <NavLink href="/owner">Owner</NavLink>}
             </nav>
           </div>
           <div className="flex items-center gap-3">

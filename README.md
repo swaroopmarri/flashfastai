@@ -29,6 +29,7 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    | `SES_NOTIFICATIONS_SECRET` | Any long random string you generate — optional, only needed for SES bounce/complaint feedback (see **Setting up SES bounce and complaint feedback**) |
    | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Razorpay dashboard → Settings → API Keys — see **Setting up Razorpay billing** |
    | `RAZORPAY_WEBHOOK_SECRET` | The secret you set when creating the Razorpay webhook — see **Setting up Razorpay billing** |
+   | `OWNER_EMAIL` | Your own login email — gates access to `/owner`, the platform-wide Owner Dashboard |
 
    The two `NEXT_PUBLIC_` values are safe to expose in the browser — they're scoped by Supabase Row Level Security, not secrets. The rest are server-only and must never be prefixed with `NEXT_PUBLIC_`:
    - `MILLIONVERIFIER_API_KEY` is only read in Server Actions / Route Handlers.
@@ -38,8 +39,9 @@ This is a [Next.js](https://nextjs.org) 14 (App Router) project with Supabase em
    - `SES_NOTIFICATIONS_SECRET` protects `/api/ses/notifications` the same way `CRON_SECRET` protects the cron route — it's a query-string token (`?secret=...`) rather than a header, since that's what an SNS HTTPS subscription URL supports.
    - `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` are only read in `src/lib/razorpay.ts`, called from the billing Server Actions (`src/app/(app)/team/billingActions.ts`) — never bundled to the client.
    - `RAZORPAY_WEBHOOK_SECRET` protects `/api/razorpay/webhook` by verifying Razorpay's HMAC signature on every request (the `x-razorpay-signature` header) — unlike the SES/cron secrets, this isn't a shared-secret query param, it's a real cryptographic signature check.
+   - `OWNER_EMAIL` is a plain string, not a secret in the same sense as the others, but still server-only — it's compared against `user.email` in `src/lib/ownerAccess.ts` to decide who can see `/owner`.
 
-   In **Vercel**, add all twelve under Project → Settings → Environment Variables (check Production, Preview, and Development), then redeploy — env var changes don't apply to already-running deployments.
+   In **Vercel**, add all thirteen under Project → Settings → Environment Variables (check Production, Preview, and Development), then redeploy — env var changes don't apply to already-running deployments.
 
 4. Run the database migrations, **in order**. Open the Supabase dashboard → **SQL Editor → New query** for each:
    - `supabase/migrations/0001_contacts_and_campaigns.sql` — creates `contact_lists`, `contacts`, `verification_jobs`, `campaigns`.
@@ -129,6 +131,14 @@ Real self-service subscriptions (upgrade/downgrade/cancel on the Team page) won'
 
 **On cancellation**, the org's quota is left as-is rather than reset to some "free tier" — there isn't one defined anywhere in this app (every org's quota otherwise defaults to a flat 10,000/10,000 from migrations 0002/0003, which is actually more generous than any paid tier). If you want cancellation to actually reduce quota, that policy needs to be decided and added to the webhook handler's `subscription.cancelled` case.
 
+## Setting up the Owner Dashboard
+
+One step: set `OWNER_EMAIL` to your own login email in your environment variables. Whoever is logged in as that exact address sees an **Owner** link in the nav and can visit `/owner`; everyone else is redirected to `/dashboard` if they try. No migration needed — it reads existing tables (`organizations`, `subscriptions`, `memberships`, `contacts`, `campaign_recipients`) plus Supabase's own `auth.users` via the service-role client's `auth.admin.listUsers()`.
+
+It shows, across every organization at once: total organizations/users, users active in the last 30 days, total verifications and emails sent (all-time and last-30-days), a per-organization table (plan, term, currency, subscription status, validation/send quota used — highlighted once past 80%), and the 20 most recent signups with their last-login date (a user who signed up but never logged back in is worth a nudge).
+
+This is the same data the SQL queries earlier in this README would give you by hand in the Supabase SQL Editor — the dashboard just means you don't have to run them yourself every time.
+
 ## Structure
 
 - `src/app/login` — email/password login + signup form (Server Actions in `actions.ts`); signup requires checking a Terms of Service/Privacy Policy acceptance box, recorded as `profiles.terms_accepted_at`
@@ -168,6 +178,8 @@ Real self-service subscriptions (upgrade/downgrade/cancel on the Team page) won'
 - `src/app/(app)/team/billingActions.ts` — `startSubscription`/`changePlan`/`cancelSubscription` Server Actions; call the Razorpay API but never write subscription status/quota directly (see **Setting up Razorpay billing**)
 - `src/app/(app)/team/BillingSection.tsx` — the Team page's "Plan & billing" UI: current plan/status, Subscribe/Switch buttons per tier, Cancel subscription
 - `src/app/api/razorpay/webhook` — verifies Razorpay's signed webhook request, then is the only place that writes `subscriptions.status`/`plan_id` and provisions `organizations.plan_validation_quota`/`plan_send_quota`
+- `src/lib/ownerAccess.ts` — `isPlatformOwner(email)`, a single allowlist check against `OWNER_EMAIL`
+- `src/app/(app)/owner` — Owner Dashboard: platform-wide stats (organizations, users, active users, total verifications/sends, all-time and last-30-days) plus a per-organization table (plan, subscription status, quota used) and a recent-signups table. Uses the service-role client to read across every organization's data — see **Setting up the Owner Dashboard**
 
 ## Organizations, invites, and quotas
 
