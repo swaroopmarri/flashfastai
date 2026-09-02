@@ -40,11 +40,15 @@ export default async function AppLayout({
             </Link>
             <nav className="flex items-center gap-1">
               <NavLink href="/dashboard">Dashboard</NavLink>
-              <NavLink href="/contacts">Contacts</NavLink>
-              <NavLink href="/network">My Network</NavLink>
+              {!isPlatformOwner(user.email) && (
+                <>
+                  <NavLink href="/contacts">Contacts</NavLink>
+                  <NavLink href="/network">My Network</NavLink>
+                  {membership?.role === "admin" && <NavLink href="/team">Team</NavLink>}
+                </>
+              )}
               <NavLink href="/campaigns">Campaigns</NavLink>
               <NavLink href="/suppression">Suppression List</NavLink>
-              {membership?.role === "admin" && <NavLink href="/team">Team</NavLink>}
               {isPlatformOwner(user.email) && <NavLink href="/owner">Owner</NavLink>}
             </nav>
           </div>

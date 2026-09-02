@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { getCurrentMembership } from "@/lib/organizations";
+import { isPlatformOwner } from "@/lib/ownerAccess";
 
 function UsageBar({ used, quota, label }: { used: number; quota: number; label: string }) {
   const pct = quota > 0 ? Math.min(100, Math.round((used / quota) * 100)) : 0;
@@ -31,6 +32,10 @@ export default async function DashboardPage() {
 
   if (!user) {
     redirect("/login");
+  }
+
+  if (isPlatformOwner(user.email)) {
+    redirect("/owner");
   }
 
   const membership = await getCurrentMembership(supabase);
