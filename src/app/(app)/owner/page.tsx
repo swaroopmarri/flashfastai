@@ -3,17 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { isPlatformOwner } from "@/lib/ownerAccess";
 import { isMissingSchemaError } from "@/lib/schemaGuard";
-
-const STATUS_COLORS: Record<string, string> = {
-  active: "bg-green-50 text-green-700",
-  created: "bg-gray-100 text-gray-500",
-  authenticated: "bg-gray-100 text-gray-500",
-  pending: "bg-amber-50 text-amber-700",
-  halted: "bg-red-50 text-red-700",
-  cancelled: "bg-gray-100 text-gray-400",
-  completed: "bg-gray-100 text-gray-400",
-  expired: "bg-gray-100 text-gray-400",
-};
+import { OrgRow } from "./OrgRow";
 
 function StatCard({ label, value, sub }: { label: string; value: number; sub?: string }) {
   return (
@@ -154,58 +144,16 @@ export default async function OwnerDashboardPage() {
               <th className="px-4 py-2 font-medium">Status</th>
               <th className="px-4 py-2 font-medium">Validations</th>
               <th className="px-4 py-2 font-medium">Sends</th>
+              <th className="px-4 py-2 font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {orgRows.map((org) => {
-              const validationPct = org.planValidationQuota
-                ? Math.round((org.validationUsed / org.planValidationQuota) * 100)
-                : 0;
-              const sendPct = org.planSendQuota
-                ? Math.round((org.sendUsed / org.planSendQuota) * 100)
-                : 0;
-              return (
-                <tr key={org.id}>
-                  <td className="px-4 py-2 font-medium text-gray-900">{org.name}</td>
-                  <td className="px-4 py-2 text-gray-500">
-                    {new Date(org.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-2 text-gray-500">
-                    {org.planId ? `${org.planId} — ${org.termId} (${org.currency})` : "No subscription"}
-                  </td>
-                  <td className="px-4 py-2">
-                    {org.subscriptionStatus ? (
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                          STATUS_COLORS[org.subscriptionStatus] ?? "bg-gray-100 text-gray-500"
-                        }`}
-                      >
-                        {org.subscriptionStatus}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td
-                    className={`px-4 py-2 ${
-                      validationPct >= 80 ? "font-medium text-amber-600" : "text-gray-700"
-                    }`}
-                  >
-                    {org.validationUsed} / {org.planValidationQuota} ({validationPct}%)
-                  </td>
-                  <td
-                    className={`px-4 py-2 ${
-                      sendPct >= 80 ? "font-medium text-amber-600" : "text-gray-700"
-                    }`}
-                  >
-                    {org.sendUsed} / {org.planSendQuota} ({sendPct}%)
-                  </td>
-                </tr>
-              );
-            })}
+            {orgRows.map((org) => (
+              <OrgRow key={org.id} org={org} />
+            ))}
             {orgRows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
+                <td colSpan={7} className="px-4 py-6 text-center text-gray-400">
                   No organizations yet.
                 </td>
               </tr>

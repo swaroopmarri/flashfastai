@@ -139,6 +139,12 @@ It shows, across every organization at once: total organizations/users, users ac
 
 This is the same data the SQL queries earlier in this README would give you by hand in the Supabase SQL Editor — the dashboard just means you don't have to run them yourself every time.
 
+**Two write actions**, both on the Organizations table:
+- **Edit quota** — set an org's `plan_validation_quota`/`plan_send_quota` to any value directly. Use this to comp a customer, grant extra credits outside their Razorpay plan, or fix a stuck value. This is the one deliberate exception to "only the webhook writes quota" (see **Setting up Razorpay billing**) — that rule stops a customer's browser from granting itself quota; it doesn't apply to the owner acting with full authority here.
+- **Delete** — permanently removes an organization **and every member's account**: their login, contact lists, contacts, verification jobs, campaigns, and profile. This works by deleting each member's actual Supabase Auth user, which cascades all of that automatically through foreign keys already in the schema. Irreversible — requires typing the exact organization name to confirm.
+
+Both actions re-check `isPlatformOwner` on the server on every call (`src/app/(app)/owner/actions.ts`), not just in the UI — the button rendering for you isn't the actual security boundary.
+
 ## Structure
 
 - `src/app/login` — email/password login + signup form (Server Actions in `actions.ts`); signup requires checking a Terms of Service/Privacy Policy acceptance box, recorded as `profiles.terms_accepted_at`
@@ -180,6 +186,8 @@ This is the same data the SQL queries earlier in this README would give you by h
 - `src/app/api/razorpay/webhook` — verifies Razorpay's signed webhook request, then is the only place that writes `subscriptions.status`/`plan_id` and provisions `organizations.plan_validation_quota`/`plan_send_quota`
 - `src/lib/ownerAccess.ts` — `isPlatformOwner(email)`, a single allowlist check against `OWNER_EMAIL`
 - `src/app/(app)/owner` — Owner Dashboard: platform-wide stats (organizations, users, active users, total verifications/sends, all-time and last-30-days) plus a per-organization table (plan, subscription status, quota used) and a recent-signups table. Uses the service-role client to read across every organization's data — see **Setting up the Owner Dashboard**
+- `src/app/(app)/owner/actions.ts` — `setOrganizationQuota` (comp/adjust an org's quota directly, bypassing the Razorpay-webhook-only rule on purpose) and `deleteOrganization` (permanently deletes an org and every member's account/data by deleting each member's auth user, which cascades everything via existing foreign keys). Both re-check `isPlatformOwner` server-side on every call, independent of the UI
+- `src/app/(app)/owner/OrgRow.tsx` — per-organization row UI: inline quota editing, and account deletion behind a type-the-organization-name confirmation
 
 ## Organizations, invites, and quotas
 
