@@ -3,7 +3,9 @@ import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { isPlatformOwner } from "@/lib/ownerAccess";
 import { isMissingSchemaError } from "@/lib/schemaGuard";
-import { OrgRow } from "./OrgRow";
+import { getTerm, type CurrencyCode, type TermId } from "@/lib/pricingPlans";
+import { OrgRow, type OrgRowData } from "./OrgRow";
+import { TrendChart, type TrendPoint } from "./TrendChart";
 
 function StatCard({ label, value, sub }: { label: string; value: number; sub?: string }) {
   return (
@@ -13,6 +15,48 @@ function StatCard({ label, value, sub }: { label: string; value: number; sub?: s
       {sub && <p className="text-xs text-gray-400">{sub}</p>}
     </div>
   );
+}
+
+function MrrCard({ currency, amount }: { currency: "INR" | "USD"; amount: number }) {
+  const formatted =
+    currency === "INR"
+      ? `₹${Math.round(amount).toLocaleString("en-IN")}`
+      : `$${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <p className="text-xs text-gray-500">MRR ({currency})</p>
+      <p className="text-2xl font-semibold text-gray-900">{formatted}</p>
+      <p className="text-xs text-gray-400">Ex-GST, active subscriptions only</p>
+    </div>
+  );
+}
+
+/** Monthly-equivalent revenue (ex-GST) for one org's active subscription, or
+ * null if it has none / isn't active / references a plan-term combo that no
+ * longer exists in pricingPlans.ts. */
+function monthlyRevenueExGst(org: OrgRowData): number | null {
+  if (org.subscriptionStatus !== "active" || !org.planId || !org.termId || !org.currency) {
+    return null;
+  }
+  const term = getTerm(org.planId, org.currency as CurrencyCode, org.termId as TermId);
+  return term ? term.totalPriceExGst / term.months : null;
+}
+
+/** Buckets ISO timestamps into UTC-day counts covering the last `days` days
+ * (oldest first), including days with zero activity. */
+function bucketByDay(timestamps: string[], days: number): TrendPoint[] {
+  const buckets = new Map<string, number>();
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() - i);
+    buckets.set(d.toISOString().slice(0, 10), 0);
+  }
+  for (const ts of timestamps) {
+    const day = ts.slice(0, 10);
+    if (buckets.has(day)) buckets.set(day, (buckets.get(day) ?? 0) + 1);
+  }
+  return Array.from(buckets.entries()).map(([date, count]) => ({ date, count }));
 }
 
 export default async function OwnerDashboardPage() {
@@ -45,13 +89,13 @@ export default async function OwnerDashboardPage() {
     admin.from("contacts").select("*", { count: "exact", head: true }).not("verified_at", "is", null),
     admin
       .from("contacts")
-      .select("*", { count: "exact", head: true })
+      .select("verified_at")
       .not("verified_at", "is", null)
       .gte("verified_at", thirtyDaysAgo),
     admin.from("campaign_recipients").select("*", { count: "exact", head: true }).eq("status", "sent"),
     admin
       .from("campaign_recipients")
-      .select("*", { count: "exact", head: true })
+      .select("sent_at")
       .eq("status", "sent")
       .gte("sent_at", thirtyDaysAgo),
   ]);
@@ -109,6 +153,37 @@ export default async function OwnerDashboardPage() {
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 20);
 
+  const mrrByCurrency = new Map<CurrencyCode, number>();
+  for (const org of orgRows) {
+    const monthly = monthlyRevenueExGst(org);
+    if (monthly !== null) {
+      mrrByCurrency.set(
+        org.currency as CurrencyCode,
+        (mrrByCurrency.get(org.currency as CurrencyCode) ?? 0) + monthly,
+      );
+    }
+  }
+
+  const dailyVerifications = bucketByDay(
+    (verified30dResult.data ?? []).map((r) => r.verified_at as string),
+    30,
+  );
+  const dailySends = bucketByDay(
+    (sent30dResult.data ?? []).map((r) => r.sent_at as string),
+    30,
+  );
+  const verified30dCount = dailyVerifications.reduce((sum, d) => sum + d.count, 0);
+  const sent30dCount = dailySends.reduce((sum, d) => sum + d.count, 0);
+
+  const paymentIssues = orgRows.filter(
+    (o) => o.subscriptionStatus === "halted" || o.subscriptionStatus === "pending",
+  );
+  const quotaAlerts = orgRows.filter((o) => {
+    const validationPct = o.planValidationQuota ? o.validationUsed / o.planValidationQuota : 0;
+    const sendPct = o.planSendQuota ? o.sendUsed / o.planSendQuota : 0;
+    return validationPct >= 0.9 || sendPct >= 0.9;
+  });
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <h1 className="mb-2 text-2xl font-semibold text-gray-900">Owner Dashboard</h1>
@@ -117,6 +192,11 @@ export default async function OwnerDashboardPage() {
         customers, gated to a single owner email.
       </p>
 
+      <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-2">
+        <MrrCard currency="INR" amount={mrrByCurrency.get("INR") ?? 0} />
+        <MrrCard currency="USD" amount={mrrByCurrency.get("USD") ?? 0} />
+      </div>
+
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard label="Organizations" value={organizations.length} />
         <StatCard label="Users" value={users.length} />
@@ -124,14 +204,50 @@ export default async function OwnerDashboardPage() {
         <StatCard
           label="Verifications"
           value={totalVerifiedResult.count ?? 0}
-          sub={`${verified30dResult.count ?? 0} in last 30d`}
+          sub={`${verified30dCount} in last 30d`}
         />
         <StatCard
           label="Emails sent"
           value={totalSentResult.count ?? 0}
-          sub={`${sent30dResult.count ?? 0} in last 30d`}
+          sub={`${sent30dCount} in last 30d`}
         />
       </div>
+
+      <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <TrendChart title="Verifications per day" color="blue" data={dailyVerifications} />
+        <TrendChart title="Emails sent per day" color="orange" data={dailySends} />
+      </div>
+
+      {(paymentIssues.length > 0 || quotaAlerts.length > 0) && (
+        <div className="mb-8">
+          <h2 className="mb-3 text-lg font-medium text-gray-900">Needs attention</h2>
+          <div className="space-y-2">
+            {paymentIssues.map((org) => (
+              <div
+                key={`payment-${org.id}`}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm"
+              >
+                <span className="font-medium text-red-900">{org.name}</span>
+                <span className="text-red-700">
+                  Subscription {org.subscriptionStatus} — payment failing, quota frozen
+                </span>
+              </div>
+            ))}
+            {quotaAlerts.map((org) => (
+              <div
+                key={`quota-${org.id}`}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm"
+              >
+                <span className="font-medium text-amber-900">{org.name}</span>
+                <span className="text-amber-700">
+                  {org.validationUsed}/{org.planValidationQuota} validations,{" "}
+                  {org.sendUsed}/{org.planSendQuota} sends — near quota
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <h2 className="mb-3 text-lg font-medium text-gray-900">Organizations</h2>
       <div className="mb-8 overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">

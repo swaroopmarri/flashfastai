@@ -72,7 +72,7 @@ export default async function AppLayout({
         </div>
       </header>
       <main>{children}</main>
-      <WhatsAppButton />
+      {!isPlatformOwner(user.email) && <WhatsAppButton />}
     </div>
   );
 }
