@@ -32,7 +32,7 @@ export function OrgRow({ org }: { org: OrgRowData }) {
   const [validationQuota, setValidationQuota] = useState(org.planValidationQuota);
   const [sendQuota, setSendQuota] = useState(org.planSendQuota);
   const [editingQuota, setEditingQuota] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<"closed" | "confirmName" | "finalConfirm">("closed");
   const [confirmName, setConfirmName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -156,7 +156,7 @@ export function OrgRow({ org }: { org: OrgRowData }) {
             )}
             <button
               type="button"
-              onClick={() => setConfirmingDelete(true)}
+              onClick={() => setDeleteStep("confirmName")}
               className="rounded-md border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
             >
               Delete
@@ -180,13 +180,13 @@ export function OrgRow({ org }: { org: OrgRowData }) {
         </tr>
       )}
 
-      {confirmingDelete && (
+      {deleteStep === "confirmName" && (
         <tr>
           <td colSpan={7} className="bg-red-50 px-4 py-3">
             <p className="mb-2 text-xs text-red-800">
-              This permanently deletes <strong>{org.name}</strong> and every member&apos;s account,
-              contact lists, campaigns, and data. This cannot be undone. Type the organization name
-              to confirm:
+              Step 1 of 2 — this will permanently delete <strong>{org.name}</strong> and every
+              member&apos;s account, contact lists, campaigns, and data. Type the organization name
+              to continue:
             </p>
             <div className="flex items-center gap-2">
               <input
@@ -198,19 +198,51 @@ export function OrgRow({ org }: { org: OrgRowData }) {
               />
               <button
                 type="button"
-                onClick={confirmDelete}
-                disabled={isPending || confirmName !== org.name}
+                onClick={() => setDeleteStep("finalConfirm")}
+                disabled={confirmName !== org.name}
                 className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isPending ? "Deleting…" : "Permanently delete"}
+                Continue
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  setConfirmingDelete(false);
+                  setDeleteStep("closed");
                   setConfirmName("");
                 }}
                 className="rounded-md border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </td>
+        </tr>
+      )}
+
+      {deleteStep === "finalConfirm" && (
+        <tr>
+          <td colSpan={7} className="bg-red-100 px-4 py-3">
+            <p className="mb-2 text-xs font-semibold text-red-900">
+              Step 2 of 2 — last chance. Deleting <strong>{org.name}</strong> cannot be undone: every
+              member loses their login immediately, and all their contact lists, contacts,
+              verification history, and campaigns are permanently erased.
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={confirmDelete}
+                disabled={isPending}
+                className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isPending ? "Deleting…" : `Yes, permanently delete ${org.name}`}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteStep("closed");
+                  setConfirmName("");
+                }}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
               >
                 Cancel
               </button>
