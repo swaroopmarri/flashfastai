@@ -4,6 +4,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { isPlatformOwner } from "@/lib/ownerAccess";
 import { isMissingSchemaError } from "@/lib/schemaGuard";
 import { getTerm, type CurrencyCode, type TermId } from "@/lib/pricingPlans";
+import { verificationCostInr, sendCostInr, USD_TO_INR_RATE } from "@/lib/providerCosts";
 import { OrgRow, type OrgRowData } from "./OrgRow";
 import { TrendChart, type TrendPoint } from "./TrendChart";
 
@@ -175,6 +176,12 @@ export default async function OwnerDashboardPage() {
   const verified30dCount = dailyVerifications.reduce((sum, d) => sum + d.count, 0);
   const sent30dCount = dailySends.reduce((sum, d) => sum + d.count, 0);
 
+  const cost30dInr = verificationCostInr(verified30dCount) + sendCostInr(sent30dCount);
+  const revenue30dInr =
+    (mrrByCurrency.get("INR") ?? 0) + (mrrByCurrency.get("USD") ?? 0) * USD_TO_INR_RATE;
+  const margin30dInr = revenue30dInr - cost30dInr;
+  const marginPct30d = revenue30dInr > 0 ? (margin30dInr / revenue30dInr) * 100 : null;
+
   const paymentIssues = orgRows.filter(
     (o) => o.subscriptionStatus === "halted" || o.subscriptionStatus === "pending",
   );
@@ -195,6 +202,35 @@ export default async function OwnerDashboardPage() {
       <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-2">
         <MrrCard currency="INR" amount={mrrByCurrency.get("INR") ?? 0} />
         <MrrCard currency="USD" amount={mrrByCurrency.get("USD") ?? 0} />
+      </div>
+
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="text-xs text-gray-500">Est. revenue (30d)</p>
+          <p className="text-2xl font-semibold text-gray-900">
+            ₹{Math.round(revenue30dInr).toLocaleString("en-IN")}
+          </p>
+          <p className="text-xs text-gray-400">MRR, INR + USD blended at ₹{USD_TO_INR_RATE}/USD</p>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="text-xs text-gray-500">Est. provider cost (30d)</p>
+          <p className="text-2xl font-semibold text-gray-900">
+            ₹{Math.round(cost30dInr).toLocaleString("en-IN")}
+          </p>
+          <p className="text-xs text-gray-400">MillionVerifier + AWS SES, actual usage</p>
+        </div>
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <p className="text-xs text-gray-500">Est. margin (30d)</p>
+          <p className="text-2xl font-semibold text-gray-900">
+            ₹{Math.round(margin30dInr).toLocaleString("en-IN")}
+            {marginPct30d !== null && (
+              <span className="ml-1 text-base font-normal text-gray-400">
+                ({marginPct30d.toFixed(0)}%)
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-gray-400">Rough estimate -- ignores non-provider overhead</p>
+        </div>
       </div>
 
       <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
