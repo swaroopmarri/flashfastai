@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
@@ -47,7 +48,10 @@ export default async function LandingPage() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <span className="text-lg font-semibold text-gray-900">Campaign Monster</span>
+          <span className="flex items-center gap-2 text-lg font-semibold text-gray-900">
+            <Image src="/logo-icon.png" alt="" width={28} height={28} className="rounded-md" />
+            Campaign Monster
+          </span>
           <nav className="hidden items-center gap-6 text-sm text-gray-600 sm:flex">
             <a href="#features" className="hover:text-gray-900">
               Features
