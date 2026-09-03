@@ -13,9 +13,25 @@ const geistMono = localFont({
   weight: "100 900",
 });
 
+const description =
+  "Upload contacts, verify every email before you send, and run compliant email campaigns — all in one platform.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://campaign-monster.com"),
   title: "Campaign Monster",
-  description: "Next.js + Supabase authentication starter",
+  description,
+  openGraph: {
+    title: "Campaign Monster",
+    description,
+    url: "https://campaign-monster.com",
+    siteName: "Campaign Monster",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Campaign Monster",
+    description,
+  },
 };
 
 export default function RootLayout({
