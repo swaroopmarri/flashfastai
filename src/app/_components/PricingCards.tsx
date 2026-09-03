@@ -2,12 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  PRICING_PLANS,
-  getCurrencyPricing,
-  withGst,
-  type CurrencyCode,
-} from "@/lib/pricingPlans";
+import { PRICING_PLANS, getCurrencyPricing, type CurrencyCode } from "@/lib/pricingPlans";
 
 const CURRENCY_SYMBOL: Record<CurrencyCode, string> = { INR: "₹", USD: "$" };
 
@@ -40,9 +35,6 @@ export function PricingCards() {
           const pricing = getCurrencyPricing(plan.id, currency);
           if (!pricing) return null;
           const isPopular = plan.id === "pro";
-          const monthlyDisplay = pricing.gstApplicable
-            ? withGst(pricing.monthlyPriceExGst)
-            : pricing.monthlyPriceExGst;
 
           return (
             <div
@@ -66,14 +58,11 @@ export function PricingCards() {
                 <p className="text-sm font-medium uppercase tracking-wide opacity-90">{plan.name}</p>
                 <p className="mt-1 text-3xl font-semibold">
                   {symbol}
-                  {monthlyDisplay.toLocaleString(locale)}
+                  {pricing.monthlyPriceExGst.toLocaleString(locale)}
                   <span className="text-sm font-normal opacity-80">/mo</span>
                 </p>
                 <p className="mt-1 text-xs opacity-90">
                   Up to {plan.contacts.toLocaleString("en-IN")} contacts
-                </p>
-                <p className="mt-0.5 text-[10px] opacity-75">
-                  {pricing.gstApplicable ? "Price includes 18% GST" : "Excludes any local taxes"}
                 </p>
               </div>
 
@@ -88,19 +77,16 @@ export function PricingCards() {
                 <ul className="mt-4 space-y-1 border-t border-gray-100 pt-4 text-left text-xs text-gray-500">
                   {pricing.terms
                     .filter((t) => t.discountPercent > 0)
-                    .map((t) => {
-                      const total = pricing.gstApplicable ? withGst(t.totalPriceExGst) : t.totalPriceExGst;
-                      return (
-                        <li key={t.id}>
-                          Prepay {t.label.toLowerCase()}:{" "}
-                          <span className="font-medium text-gray-700">
-                            {symbol}
-                            {total.toLocaleString(locale)}
-                          </span>{" "}
-                          <span className="text-emerald-600">(save {t.discountPercent}%)</span>
-                        </li>
-                      );
-                    })}
+                    .map((t) => (
+                      <li key={t.id}>
+                        Prepay {t.label.toLowerCase()}:{" "}
+                        <span className="font-medium text-gray-700">
+                          {symbol}
+                          {t.totalPriceExGst.toLocaleString(locale)}
+                        </span>{" "}
+                        <span className="text-emerald-600">(save {t.discountPercent}%)</span>
+                      </li>
+                    ))}
                 </ul>
 
                 <Link

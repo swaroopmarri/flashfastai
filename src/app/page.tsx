@@ -139,7 +139,7 @@ export default async function LandingPage() {
             <p className="mt-8 text-center text-xs text-gray-400">
               Most competitors charge more, and bill email verification as a
               separate add-on. Here, it&apos;s already included in every plan.
-              Indian prices include GST; USD prices exclude local taxes.
+              Prices shown exclude tax; applicable GST is added at checkout.
             </p>
           </div>
         </section>
