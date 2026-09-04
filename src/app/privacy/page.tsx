@@ -96,12 +96,18 @@ export default function PrivacyPage() {
             6. Your responsibility for contacts you upload
           </h2>
           <p>
-            If you upload someone else&apos;s email address, you are the
-            party responsible for having a lawful basis to hold and email
-            that data — we act as a processor of the contact data you
-            provide, not as the party who decided to collect it. See our{" "}
+            We process the contact and campaign information you provide solely to deliver email
+            marketing, campaign management, delivery, reporting, unsubscribe, and suppression
+            functionality — see &quot;How we use it&quot; above. If you upload someone else&apos;s
+            email address, you are the party responsible for having a lawful basis to hold and
+            email that data — we act as a processor of the contact data you provide, not as the
+            party who decided to collect it. See our{" "}
             <Link href="/terms" className="text-indigo-600 hover:underline">
               Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link href="/acceptable-use" className="text-indigo-600 hover:underline">
+              Acceptable Use Policy
             </Link>{" "}
             for more on this.
           </p>

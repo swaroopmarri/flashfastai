@@ -59,11 +59,18 @@ export default function TermsPage() {
           </p>
           <p className="mt-2">
             You agree not to upload or email contacts you don&apos;t have permission to contact,
-            purchased or scraped lists, or any list assembled in violation of applicable law. We
-            may suspend or terminate your account immediately and without notice if we suspect
-            your use of the Service violates this section, generates spam complaints, produces
-            abnormal bounce rates, or otherwise creates risk to our relationship with our email or
-            verification providers, and we are not liable to you for any resulting loss.
+            purchased or scraped lists, or any list assembled in violation of applicable law. You
+            further agree not to use the Service for spam, unsolicited bulk email, phishing,
+            fraudulent or deceptive communications, malware distribution, impersonation of any
+            person or organization, or any attempt to circumvent an unsubscribe request or
+            suppression record — see our{" "}
+            <Link href="/acceptable-use" className="text-indigo-600 hover:underline">
+              Acceptable Use Policy
+            </Link>{" "}
+            for detail. We may suspend or terminate your account immediately and without notice if
+            we suspect your use of the Service violates this section, generates spam complaints,
+            produces abnormal bounce rates, or otherwise creates risk to our relationship with our
+            email or verification providers, and we are not liable to you for any resulting loss.
           </p>
         </section>
 

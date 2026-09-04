@@ -16,6 +16,7 @@ type Props =
 export function UploadForm(props: Props) {
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
   const [preview, setPreview] = useState<{
     rows: ParsedContactRow[];
     skipped: number;
@@ -49,7 +50,7 @@ export function UploadForm(props: Props) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!preview || preview.rows.length === 0) return;
+    if (!preview || preview.rows.length === 0 || !confirmed) return;
 
     startTransition(async () => {
       try {
@@ -59,6 +60,7 @@ export function UploadForm(props: Props) {
           await mergeContacts(props.listId, preview.rows);
           setFile(null);
           setPreview(null);
+          setConfirmed(false);
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Upload failed.");
@@ -132,9 +134,28 @@ export function UploadForm(props: Props) {
         </p>
       )}
 
+      <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p className="font-medium">Only import contacts you are authorized to email.</p>
+        <p className="mt-0.5 text-xs">
+          Do not upload purchased, rented, scraped, harvested, or otherwise unauthorized email
+          lists.
+        </p>
+      </div>
+
+      <label className="flex items-start gap-2 text-sm text-gray-700">
+        <input
+          type="checkbox"
+          checked={confirmed}
+          onChange={(e) => setConfirmed(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+        />
+        I confirm that I am authorized to send marketing communications to the contacts I am
+        importing and that the contacts were obtained in accordance with applicable requirements.
+      </label>
+
       <button
         type="submit"
-        disabled={!file || !preview || preview.rows.length === 0 || isPending}
+        disabled={!file || !preview || preview.rows.length === 0 || !confirmed || isPending}
         className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isPending

@@ -112,6 +112,16 @@ export default async function OwnerDashboardPage() {
   if (totalSentResult.error) throw totalSentResult.error;
   if (sent30dResult.error) throw sent30dResult.error;
 
+  const abuseReportsResult = await admin
+    .from("abuse_reports")
+    .select("id, reporter_email, recipient_email, sender_email, subject, reason, created_at")
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (abuseReportsResult.error && !isMissingSchemaError(abuseReportsResult.error)) {
+    throw abuseReportsResult.error;
+  }
+  const abuseReports = abuseReportsResult.data ?? [];
+
   const users = usersResult.data.users;
   const organizations = orgsResult.data ?? [];
   const subscriptions = subscriptionsResult.data ?? [];
@@ -281,6 +291,38 @@ export default async function OwnerDashboardPage() {
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {abuseReports.length > 0 && (
+        <div className="mb-8">
+          <h2 className="mb-3 text-lg font-medium text-gray-900">Abuse reports</h2>
+          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead>
+                <tr className="text-left text-gray-500">
+                  <th className="px-4 py-2 font-medium">Reported</th>
+                  <th className="px-4 py-2 font-medium">Reporter</th>
+                  <th className="px-4 py-2 font-medium">Recipient</th>
+                  <th className="px-4 py-2 font-medium">Sender</th>
+                  <th className="px-4 py-2 font-medium">Reason</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {abuseReports.map((r) => (
+                  <tr key={r.id}>
+                    <td className="px-4 py-2 text-gray-500">
+                      {new Date(r.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-2 text-gray-900">{r.reporter_email}</td>
+                    <td className="px-4 py-2 text-gray-900">{r.recipient_email}</td>
+                    <td className="px-4 py-2 text-gray-500">{r.sender_email ?? "—"}</td>
+                    <td className="px-4 py-2 text-gray-700">{r.reason}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

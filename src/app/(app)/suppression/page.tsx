@@ -79,9 +79,11 @@ export default async function SuppressionPage() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="mb-2 text-2xl font-semibold text-gray-900">Suppression List</h1>
       <p className="mb-8 text-sm text-gray-500">
-        Every email address that will never be sent a campaign, and why —
+        Every email address that will never be sent a campaign from your account, and why —
         bounced/undeliverable, unsubscribed, and (if your SES setup reports
-        it) spam complaints.
+        it) spam complaints. Suppression here is scoped to your account and is permanent — once an
+        address is unsubscribed or complains, it stays suppressed even if you re-upload it later,
+        and there is no way to bypass it from within Campaign Monster.
       </p>
 
       {/* Spam complaints -- highest risk, shown first */}

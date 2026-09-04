@@ -14,14 +14,14 @@ const geistMono = localFont({
 });
 
 const description =
-  "Upload contacts, verify every email before you send, and run compliant email campaigns — all in one platform.";
+  "Create and manage permission-based email campaigns with contact verification, unsubscribe management, suppression controls, and scalable email delivery.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://campaign-monster.com"),
-  title: "Campaign Monster",
+  title: "Campaign Monster — Email Marketing & Campaign Management Platform",
   description,
   openGraph: {
-    title: "Campaign Monster",
+    title: "Campaign Monster — Email Marketing & Campaign Management Platform",
     description,
     url: "https://campaign-monster.com",
     siteName: "Campaign Monster",
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Campaign Monster",
+    title: "Campaign Monster — Email Marketing & Campaign Management Platform",
     description,
   },
 };

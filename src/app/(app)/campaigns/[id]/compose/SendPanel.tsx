@@ -12,6 +12,7 @@ interface Summary {
 
 type PanelState =
   | { phase: "idle" }
+  | { phase: "confirming" }
   | { phase: "starting" }
   | { phase: "polling"; totalRecipients: number; processedRecipients: number }
   | { phase: "done"; summary: Summary }
@@ -47,6 +48,7 @@ export function SendPanel({
     }
     return { phase: "idle" };
   });
+  const [confirmed, setConfirmed] = useState(false);
   const jobIdRef = useRef<string | null>(initialJobId);
   const router = useRouter();
 
@@ -95,9 +97,6 @@ export function SendPanel({
   }, [state.phase]);
 
   async function handleSend() {
-    if (!confirm(`Send this campaign to ${recipientCount} recipient${recipientCount === 1 ? "" : "s"}?`)) {
-      return;
-    }
     setState({ phase: "starting" });
     try {
       const result = await startCampaignSendAction(campaignId);
@@ -123,11 +122,11 @@ export function SendPanel({
         <h2 className="text-lg font-medium text-gray-900">Send</h2>
         {state.phase === "idle" && (
           <button
-            onClick={handleSend}
+            onClick={() => setState({ phase: "confirming" })}
             disabled={!canSend || recipientCount === 0}
             className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Send Campaign
+            Review Campaign
           </button>
         )}
       </div>
@@ -138,6 +137,43 @@ export function SendPanel({
           receive this campaign.
           {!canSend && " Save a subject and body before sending."}
         </p>
+      )}
+
+      {state.phase === "confirming" && (
+        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm text-amber-900">
+            Please confirm that this campaign is being sent to recipients who have provided
+            appropriate permission or for whom you have another lawful basis to communicate.
+          </p>
+          <label className="mt-3 flex items-start gap-2 text-sm text-amber-900">
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-amber-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            I confirm that I am authorized to send this campaign to the {recipientCount}{" "}
+            selected recipient{recipientCount === 1 ? "" : "s"}.
+          </label>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={handleSend}
+              disabled={!confirmed}
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Send Campaign
+            </button>
+            <button
+              onClick={() => {
+                setState({ phase: "idle" });
+                setConfirmed(false);
+              }}
+              className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {state.phase === "starting" && (

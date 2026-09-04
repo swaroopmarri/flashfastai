@@ -15,7 +15,7 @@ const FEATURES = [
       "Every contact list is checked against MillionVerifier before you send, so you're not paying to email addresses that will just bounce.",
   },
   {
-    title: "Upload any way",
+    title: "Import your lists",
     emoji: "📤",
     accent: "bg-sky-100 text-sky-700",
     description:
@@ -29,11 +29,91 @@ const FEATURES = [
       "Every contact across every list, grouped by company and deduplicated by email, so you always know who's verified and who isn't.",
   },
   {
-    title: "Built-in compliance",
+    title: "Automatic suppression",
     emoji: "🛡️",
     accent: "bg-emerald-100 text-emerald-700",
     description:
       "Every campaign includes a working unsubscribe link, honored automatically and permanently — no re-uploading a suppressed contact by accident.",
+  },
+];
+
+const PERMISSION_CARDS = [
+  {
+    title: "Verified contacts",
+    description:
+      "Verify email addresses before sending campaigns to help reduce invalid recipients and improve list quality.",
+  },
+  {
+    title: "Easy unsubscribe",
+    description: "Give recipients a clear way to unsubscribe from marketing communications.",
+  },
+  {
+    title: "Suppression protection",
+    description:
+      "Unsubscribed and suppressed recipients aren't targeted by that account's future marketing campaigns.",
+  },
+  {
+    title: "Responsible sending",
+    description:
+      "Customers are responsible for ensuring their campaigns comply with applicable email marketing, privacy, and anti-spam requirements.",
+  },
+];
+
+const DELIVERABILITY_CARDS = [
+  {
+    title: "List verification",
+    description: "Identify potentially invalid addresses before sending.",
+  },
+  {
+    title: "Bounce handling",
+    description:
+      "Delivery failures reported by our sending provider are recorded against the contact automatically.",
+  },
+  {
+    title: "Unsubscribe management",
+    description: "Respect recipient opt-out requests with a working link on every campaign.",
+  },
+  {
+    title: "Suppression",
+    description: "Prevent previously suppressed recipients from being targeted again by your account.",
+  },
+  {
+    title: "Domain authentication",
+    description:
+      "Campaigns are sent from a domain authenticated with SPF, DKIM, and DMARC to support reliable delivery.",
+  },
+];
+
+const FAQ_ITEMS = [
+  {
+    question: "Can I upload purchased email lists?",
+    answer:
+      "No. Campaign Monster does not permit purchased, rented, scraped, harvested, or otherwise unauthorized email lists — see our Acceptable Use Policy.",
+  },
+  {
+    question: "Can I send cold emails?",
+    answer:
+      "Campaign Monster is designed for permission-based email marketing. Customers are responsible for ensuring they have appropriate permission or another lawful basis to communicate with their recipients.",
+  },
+  {
+    question: "Does Campaign Monster support unsubscribe?",
+    answer:
+      "Yes. Every campaign includes a working unsubscribe link, and unsubscribing suppresses that address from future campaigns sent by that account.",
+  },
+  {
+    question: "What happens when someone unsubscribes?",
+    answer:
+      "The address is added to your account's suppression list and is automatically excluded from every campaign you send afterward, even if it's re-uploaded later.",
+  },
+  {
+    question: "Can I send to my whole list at once?",
+    answer:
+      "Each plan includes a monthly contact allowance (3,500 up to 45,000+, depending on plan) covering both verification and sending. Need more? Contact us to discuss a larger allowance.",
+  },
+  {
+    question: "Does Campaign Monster verify email addresses?",
+    answer:
+      "Yes — every contact is checked by a third-party verification provider before it's eligible to receive a campaign, to help identify invalid or potentially undeliverable addresses. This reduces avoidable bounces; it doesn't guarantee inbox placement.",
   },
 ];
 
@@ -83,12 +163,12 @@ export default async function LandingPage() {
           <div className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-10 px-4 py-16 sm:py-20 lg:grid-cols-2">
             <div className="text-center lg:text-left">
               <h1 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
-                Upload, verify, and send email campaigns — all in one place.
+                Import, verify, and send permission-based email campaigns — all in one place.
               </h1>
               <p className="mx-auto mt-6 max-w-xl text-lg text-gray-600 lg:mx-0">
-                Campaign Monster takes a raw contact list and turns it into a clean,
+                Campaign Monster turns your customer and subscriber list into a clean,
                 deliverable email campaign: real-time verification, one-click
-                sending, and automatic compliance — no separate tools required.
+                sending, and automatic unsubscribe handling — no separate tools required.
               </p>
               <div className="mt-8">
                 <Link
@@ -129,6 +209,45 @@ export default async function LandingPage() {
           </div>
         </section>
 
+        {/* Permission-based sending */}
+        <section className="bg-gray-50 py-16">
+          <div className="mx-auto max-w-5xl px-4">
+            <h2 className="mb-3 text-center text-2xl font-semibold text-gray-900">
+              Built for Permission-Based Email Marketing
+            </h2>
+            <p className="mx-auto mb-10 max-w-2xl text-center text-sm text-gray-600">
+              Campaign Monster is designed for businesses that send email to customers,
+              subscribers, and contacts who have provided appropriate permission or for whom the
+              sender has another lawful basis to communicate. We do not support spam, unsolicited
+              bulk email, purchased or scraped mailing lists, or attempts to bypass recipient
+              opt-out preferences.
+            </p>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {PERMISSION_CARDS.map((c) => (
+                <div key={c.title} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                  <h3 className="mb-2 font-medium text-gray-900">{c.title}</h3>
+                  <p className="text-sm text-gray-600">{c.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Deliverability */}
+        <section className="mx-auto max-w-5xl px-4 py-16">
+          <h2 className="mb-10 text-center text-2xl font-semibold text-gray-900">
+            Protect Your Sender Reputation
+          </h2>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
+            {DELIVERABILITY_CARDS.map((c) => (
+              <div key={c.title} className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                <h3 className="mb-2 font-medium text-gray-900">{c.title}</h3>
+                <p className="text-sm text-gray-600">{c.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Pricing */}
         <section id="pricing" className="bg-gradient-to-b from-white to-indigo-50/60 py-16">
           <div className="mx-auto max-w-5xl px-4">
@@ -145,6 +264,21 @@ export default async function LandingPage() {
               separate add-on. Here, it&apos;s already included in every plan.
               Prices shown exclude tax; applicable GST is added at checkout.
             </p>
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section className="mx-auto max-w-3xl px-4 py-16">
+          <h2 className="mb-10 text-center text-2xl font-semibold text-gray-900">
+            Frequently asked questions
+          </h2>
+          <div className="space-y-6">
+            {FAQ_ITEMS.map((item) => (
+              <div key={item.question}>
+                <h3 className="font-medium text-gray-900">{item.question}</h3>
+                <p className="mt-1 text-sm text-gray-600">{item.answer}</p>
+              </div>
+            ))}
           </div>
         </section>
       </main>
@@ -180,6 +314,12 @@ export default async function LandingPage() {
                 </Link>
                 <Link href="/privacy" className="text-sm text-gray-500 hover:text-gray-900">
                   Privacy Policy
+                </Link>
+                <Link href="/acceptable-use" className="text-sm text-gray-500 hover:text-gray-900">
+                  Acceptable Use Policy
+                </Link>
+                <Link href="/report-abuse" className="text-sm text-gray-500 hover:text-gray-900">
+                  Report Abuse
                 </Link>
               </div>
             </div>
