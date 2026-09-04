@@ -17,7 +17,7 @@ export default function TermsPage() {
           <h2 className="mb-2 text-lg font-medium text-gray-900">1. Acceptance of these Terms</h2>
           <p>
             Campaign Monster (&quot;the Service&quot;, &quot;we&quot;, &quot;us&quot;,
-            &quot;our&quot;) is operated by Campaign Monster ([ADDRESS]). By checking the
+            &quot;our&quot;) is operated by Campaign Monster (Hyderabad, India). By checking the
             acceptance box at signup, creating an account, or otherwise accessing or using the
             Service, you agree to be bound by these Terms of Service and our Privacy Policy in
             full. If you don&apos;t agree, don&apos;t create an account or use the Service. If
@@ -197,7 +197,7 @@ export default function TermsPage() {
           <p>
             These Terms are governed by the laws of India, without regard to conflict-of-law
             principles. Any dispute arising out of or relating to these Terms or the Service will
-            be subject to the exclusive jurisdiction of the courts of [CITY], India, and you
+            be subject to the exclusive jurisdiction of the courts of Hyderabad, India, and you
             consent to that jurisdiction and waive any objection to venue there.
           </p>
         </section>
@@ -235,7 +235,7 @@ export default function TermsPage() {
         <section>
           <h2 className="mb-2 text-lg font-medium text-gray-900">15. Contact</h2>
           <p>
-            Questions about these Terms: swaroop.indus@gmail.com · +1 410-670-0167 · [ADDRESS].
+            Questions about these Terms: swaroop.indus@gmail.com · +1 410-670-0167 · Hyderabad, India.
           </p>
         </section>
       </div>

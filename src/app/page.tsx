@@ -288,7 +288,7 @@ export default async function LandingPage() {
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
             <div>
               <p className="font-medium text-gray-900">Campaign Monster</p>
-              <p className="mt-1 text-sm text-gray-500">[ADDRESS]</p>
+              <p className="mt-1 text-sm text-gray-500">Hyderabad, India</p>
             </div>
             <div>
               <p className="text-sm font-medium text-gray-900">Contact</p>

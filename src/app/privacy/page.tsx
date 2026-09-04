@@ -163,7 +163,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="mb-2 text-lg font-medium text-gray-900">11. Contact</h2>
-          <p>Questions about this policy: swaroop.indus@gmail.com · +1 410-670-0167 · [ADDRESS].</p>
+          <p>Questions about this policy: swaroop.indus@gmail.com · +1 410-670-0167 · Hyderabad, India.</p>
         </section>
       </div>
 
