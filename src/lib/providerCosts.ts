@@ -10,16 +10,22 @@
  *   one-time bulk tier, ₹39,999. That tier currently also grants +10%
  *   bonus credits; ignoring the bonus here keeps this a conservative
  *   (slightly too high) per-verification cost.
- * - AWS SES: ap-south-1 (Mumbai) console, Essentials plan, the
- *   0-10M-emails/month tier -- the account's current plan.
+ * - AWS SES: ap-south-1 (Mumbai) console, Pro plan (upgraded from
+ *   Essentials), the 0-10M-emails/month tier -- the account's current
+ *   plan. Pro also carries a flat monthly base fee on top of per-email
+ *   cost, unlike Essentials.
  *
- * Both are one-off snapshots, not a live price feed -- update the two
+ * These are one-off snapshots, not a live price feed -- update the
  * constants below when either provider's pricing or plan tier changes.
  */
 
 export const VERIFICATION_COST_INR = 39_999 / 1_000_000;
 
-export const SEND_COST_USD = 0.16 / 1000;
+export const SEND_COST_USD = 0.22 / 1000;
+
+/** Flat monthly fee for the SES Pro plan (per account per region),
+ * independent of email volume. */
+export const SES_BASE_FEE_USD_PER_MONTH = 105;
 
 /** Approximate USD->INR rate, used only to blend SES's USD-denominated
  * cost into a single INR margin estimate below. Not a live exchange rate. */

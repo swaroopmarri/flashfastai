@@ -4,7 +4,12 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { isPlatformOwner } from "@/lib/ownerAccess";
 import { isMissingSchemaError } from "@/lib/schemaGuard";
 import { getTerm, type CurrencyCode, type TermId } from "@/lib/pricingPlans";
-import { verificationCostInr, sendCostInr, USD_TO_INR_RATE } from "@/lib/providerCosts";
+import {
+  verificationCostInr,
+  sendCostInr,
+  SES_BASE_FEE_USD_PER_MONTH,
+  USD_TO_INR_RATE,
+} from "@/lib/providerCosts";
 import { OrgRow, type OrgRowData } from "./OrgRow";
 import { TrendChart, type TrendPoint } from "./TrendChart";
 
@@ -186,7 +191,10 @@ export default async function OwnerDashboardPage() {
   const verified30dCount = dailyVerifications.reduce((sum, d) => sum + d.count, 0);
   const sent30dCount = dailySends.reduce((sum, d) => sum + d.count, 0);
 
-  const cost30dInr = verificationCostInr(verified30dCount) + sendCostInr(sent30dCount);
+  const cost30dInr =
+    verificationCostInr(verified30dCount) +
+    sendCostInr(sent30dCount) +
+    SES_BASE_FEE_USD_PER_MONTH * USD_TO_INR_RATE;
   const revenue30dInr =
     (mrrByCurrency.get("INR") ?? 0) + (mrrByCurrency.get("USD") ?? 0) * USD_TO_INR_RATE;
   const margin30dInr = revenue30dInr - cost30dInr;
@@ -227,7 +235,10 @@ export default async function OwnerDashboardPage() {
           <p className="text-2xl font-semibold text-gray-900">
             ₹{Math.round(cost30dInr).toLocaleString("en-IN")}
           </p>
-          <p className="text-xs text-gray-400">MillionVerifier + AWS SES, actual usage</p>
+          <p className="text-xs text-gray-400">
+            MillionVerifier + AWS SES usage, plus SES Pro&apos;s ${SES_BASE_FEE_USD_PER_MONTH}
+            /month base fee
+          </p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <p className="text-xs text-gray-500">Est. margin (30d)</p>
