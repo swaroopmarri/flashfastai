@@ -152,10 +152,6 @@ export function BillingSection({
                 {displayTotal?.toLocaleString(currency === "INR" ? "en-IN" : "en-US")}
                 {term && term.months > 1 ? ` / ${term.months}mo` : "/mo"}
               </p>
-              {pricing?.gstApplicable && (
-                <p className="text-[10px] text-gray-400">+ GST at checkout</p>
-              )}
-
               {isCurrent ? (
                 <p className="mt-2 rounded-md bg-gray-100 px-2 py-1.5 text-xs font-medium text-gray-500">
                   Current plan
