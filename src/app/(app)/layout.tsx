@@ -58,9 +58,6 @@ export default async function AppLayout({
             </nav>
           </div>
           <div className="flex shrink-0 items-center gap-3">
-            <span className="hidden max-w-[180px] truncate text-sm text-gray-500 sm:inline-block">
-              {user.email}
-            </span>
             <Link
               href="/account"
               className="shrink-0 whitespace-nowrap rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
