@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { login, signup } from "./actions";
 
 const inputClass =
@@ -43,9 +44,14 @@ export function AuthForm() {
             <input id="email" name="email" type="email" required className={inputClass} />
           </div>
           <div>
-            <label htmlFor="password" className={labelClass}>
-              Password
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="password" className={labelClass}>
+                Password
+              </label>
+              <Link href="/forgot-password" className="text-xs text-indigo-600 hover:underline">
+                Forgot password?
+              </Link>
+            </div>
             <input
               id="password"
               name="password"

@@ -26,6 +26,57 @@ export async function login(formData: FormData) {
   redirect("/dashboard");
 }
 
+export async function requestPasswordReset(formData: FormData) {
+  const supabase = createClient();
+  const origin = headers().get("origin");
+
+  const email = (formData.get("email") as string).trim().toLowerCase();
+  if (!email) {
+    redirect(`/forgot-password?error=${encodeURIComponent("Enter your email address.")}`);
+  }
+
+  // Never reveal whether an account exists for this email -- always show
+  // the same success message regardless of what resetPasswordForEmail
+  // actually did, so this can't be used to enumerate registered accounts.
+  await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/auth/update-password")}`,
+  });
+
+  redirect(
+    `/forgot-password?message=${encodeURIComponent(
+      "If an account exists for that email, a password reset link has been sent.",
+    )}`,
+  );
+}
+
+export async function updatePassword(formData: FormData) {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect(`/login?error=${encodeURIComponent("That password reset link has expired. Request a new one.")}`);
+  }
+
+  const password = formData.get("password") as string;
+  const confirmPassword = formData.get("confirmPassword") as string;
+
+  if (!password || password.length < 6) {
+    redirect(`/auth/update-password?error=${encodeURIComponent("Password must be at least 6 characters.")}`);
+  }
+  if (password !== confirmPassword) {
+    redirect(`/auth/update-password?error=${encodeURIComponent("Passwords don't match.")}`);
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) {
+    redirect(`/auth/update-password?error=${encodeURIComponent(error.message)}`);
+  }
+
+  redirect("/login?message=Password updated. Log in with your new password.");
+}
+
 export async function signup(formData: FormData) {
   const supabase = createClient();
   const origin = headers().get("origin");
