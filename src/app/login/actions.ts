@@ -33,6 +33,8 @@ export async function signup(formData: FormData) {
   const email = (formData.get("email") as string).trim().toLowerCase();
   const password = formData.get("password") as string;
   const organizationName = (formData.get("organizationName") as string).trim();
+  const accountTypeRaw = formData.get("accountType") as string;
+  const accountType = accountTypeRaw === "company" ? "company" : "individual";
   const firstName = (formData.get("firstName") as string).trim();
   const lastName = (formData.get("lastName") as string).trim();
   const yearsExperienceRaw = formData.get("yearsExperience") as string;
@@ -71,6 +73,7 @@ export async function signup(formData: FormData) {
       emailRedirectTo: `${origin}/auth/callback`,
       data: {
         pending_org_name: organizationName,
+        pending_account_type: accountType,
         pending_first_name: firstName,
         pending_last_name: lastName,
         pending_years_experience: yearsExperience,

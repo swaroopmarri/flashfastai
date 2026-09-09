@@ -9,6 +9,7 @@ const labelClass = "block text-sm font-medium text-gray-700";
 
 export function AuthForm() {
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [accountType, setAccountType] = useState<"individual" | "company">("individual");
 
   return (
     <>
@@ -96,6 +97,37 @@ export function AuthForm() {
               required
               className={inputClass}
             />
+          </div>
+          <div>
+            <span className={labelClass}>Account type</span>
+            <div className="mt-1 flex gap-4">
+              <label className="flex items-center gap-1.5 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  name="accountType"
+                  value="individual"
+                  checked={accountType === "individual"}
+                  onChange={() => setAccountType("individual")}
+                  className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                Individual
+              </label>
+              <label className="flex items-center gap-1.5 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  name="accountType"
+                  value="company"
+                  checked={accountType === "company"}
+                  onChange={() => setAccountType("company")}
+                  className="h-4 w-4 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                Company
+              </label>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Company accounts can invite teammates and split the shared quota between them.
+              Individual accounts use the full quota alone.
+            </p>
           </div>
           <div>
             <label htmlFor="organizationName" className={labelClass}>

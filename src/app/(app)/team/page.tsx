@@ -19,10 +19,11 @@ export default async function TeamPage() {
 
   const { data: org, error: orgError } = await supabase
     .from("organizations")
-    .select("name, plan_validation_quota, plan_send_quota")
+    .select("name, plan_validation_quota, plan_send_quota, account_type")
     .eq("id", membership.organization_id)
     .single();
   if (orgError) throw orgError;
+  const isCompany = org.account_type === "company";
 
   const { data: members, error: membersError } = await supabase.rpc("get_org_members", {
     p_org_id: membership.organization_id,
@@ -100,29 +101,38 @@ export default async function TeamPage() {
         />
       </div>
 
-      <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="mb-3 text-lg font-medium text-gray-900">Invite a member</h2>
-        <InviteMemberForm />
-      </div>
+      {isCompany ? (
+        <>
+          <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="mb-3 text-lg font-medium text-gray-900">Invite a member</h2>
+            <InviteMemberForm />
+          </div>
 
-      <h2 className="mb-3 text-lg font-medium text-gray-900">Members</h2>
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead>
-            <tr className="text-left text-gray-500">
-              <th className="px-4 py-2 font-medium">Member</th>
-              <th className="px-4 py-2 font-medium">Validation quota</th>
-              <th className="px-4 py-2 font-medium">Send quota</th>
-              <th className="px-4 py-2 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {(members as OrgMember[]).map((m) => (
-              <MemberRow key={m.membership_id} member={m} isSelf={m.user_id === user.id} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+          <h2 className="mb-3 text-lg font-medium text-gray-900">Members</h2>
+          <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead>
+                <tr className="text-left text-gray-500">
+                  <th className="px-4 py-2 font-medium">Member</th>
+                  <th className="px-4 py-2 font-medium">Validation quota</th>
+                  <th className="px-4 py-2 font-medium">Send quota</th>
+                  <th className="px-4 py-2 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(members as OrgMember[]).map((m) => (
+                  <MemberRow key={m.membership_id} member={m} isSelf={m.user_id === user.id} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <p className="rounded-md bg-gray-50 px-4 py-3 text-sm text-gray-500">
+          This is an individual account, so team invites aren&apos;t available — the quota above
+          is yours alone.
+        </p>
+      )}
     </div>
   );
 }

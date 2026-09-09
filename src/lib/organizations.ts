@@ -63,7 +63,14 @@ export async function finalizeSignup(
   }
 
   const orgName = (user.user_metadata?.pending_org_name as string | undefined) || "My Organization";
-  const { error } = await supabase.rpc("create_organization", { p_name: orgName });
+  const accountType =
+    (user.user_metadata?.pending_account_type as string | undefined) === "company"
+      ? "company"
+      : "individual";
+  const { error } = await supabase.rpc("create_organization", {
+    p_name: orgName,
+    p_account_type: accountType,
+  });
   if (error) throw error;
 }
 

@@ -19,6 +19,19 @@ export async function createInvite(email: string): Promise<{ url: string }> {
   const membership = await requireAdmin(supabase);
   const origin = headers().get("origin");
 
+  // The UI already hides this form for individual accounts, but that's
+  // not the real boundary -- re-checked here since this action can be
+  // called directly regardless of what rendered.
+  const { data: org, error: orgError } = await supabase
+    .from("organizations")
+    .select("account_type")
+    .eq("id", membership.organization_id)
+    .single();
+  if (orgError) throw orgError;
+  if (org.account_type !== "company") {
+    throw new Error("Individual accounts can't invite team members.");
+  }
+
   const token = randomBytes(24).toString("hex");
 
   const { data: user } = await supabase.auth.getUser();
