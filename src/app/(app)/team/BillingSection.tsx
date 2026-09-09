@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import {
   PRICING_PLANS,
   getCurrencyPricing,
-  withGst,
   type CurrencyCode,
   type TermId,
 } from "@/lib/pricingPlans";
@@ -141,11 +140,7 @@ export function BillingSection({
         {PRICING_PLANS.map((plan) => {
           const pricing = getCurrencyPricing(plan.id, currency);
           const term = pricing?.terms.find((t) => t.id === selectedTermId);
-          const displayTotal = term
-            ? pricing?.gstApplicable
-              ? withGst(term.totalPriceExGst)
-              : term.totalPriceExGst
-            : undefined;
+          const displayTotal = term?.totalPriceExGst;
           const isCurrent =
             isActive && plan.id === currentPlanId && selectedTermId === currentTermId && currency === currentCurrency;
 
@@ -158,7 +153,7 @@ export function BillingSection({
                 {term && term.months > 1 ? ` / ${term.months}mo` : "/mo"}
               </p>
               {pricing?.gstApplicable && (
-                <p className="text-[10px] text-gray-400">incl. 18% GST</p>
+                <p className="text-[10px] text-gray-400">+ GST at checkout</p>
               )}
 
               {isCurrent ? (
