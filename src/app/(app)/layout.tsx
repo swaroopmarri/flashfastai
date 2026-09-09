@@ -34,13 +34,16 @@ export default async function AppLayout({
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <div className="flex items-center gap-6">
-            <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-              <Image src="/logo-icon.png" alt="" width={28} height={28} className="rounded-md" />
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 overflow-x-auto px-4 py-3">
+          <div className="flex shrink-0 items-center gap-5">
+            <Link
+              href="/dashboard"
+              className="flex shrink-0 items-center gap-2 whitespace-nowrap text-lg font-semibold text-gray-900"
+            >
+              <Image src="/logo-icon.png" alt="" width={28} height={28} className="shrink-0 rounded-md" />
               Campaign Monster
             </Link>
-            <nav className="flex items-center gap-1">
+            <nav className="flex shrink-0 items-center gap-1">
               <NavLink href="/dashboard">Dashboard</NavLink>
               {!isPlatformOwner(user.email) && (
                 <>
@@ -54,18 +57,20 @@ export default async function AppLayout({
               {isPlatformOwner(user.email) && <NavLink href="/owner">Owner</NavLink>}
             </nav>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-gray-500 sm:inline">{user.email}</span>
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="hidden max-w-[180px] truncate text-sm text-gray-500 sm:inline-block">
+              {user.email}
+            </span>
             <Link
               href="/account"
-              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              className="shrink-0 whitespace-nowrap rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               Account
             </Link>
-            <form action={logout}>
+            <form action={logout} className="shrink-0">
               <button
                 type="submit"
-                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="whitespace-nowrap rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Log out
               </button>
