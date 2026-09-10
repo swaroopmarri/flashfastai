@@ -86,6 +86,7 @@ export async function signup(formData: FormData) {
   const organizationName = (formData.get("organizationName") as string).trim();
   const accountTypeRaw = formData.get("accountType") as string;
   const accountType = accountTypeRaw === "company" ? "company" : "individual";
+  const referralCode = (formData.get("referralCode") as string | null)?.trim().toUpperCase() || null;
   const firstName = (formData.get("firstName") as string).trim();
   const lastName = (formData.get("lastName") as string).trim();
   const yearsExperienceRaw = formData.get("yearsExperience") as string;
@@ -125,6 +126,7 @@ export async function signup(formData: FormData) {
       data: {
         pending_org_name: organizationName,
         pending_account_type: accountType,
+        pending_referral_code: referralCode,
         pending_first_name: firstName,
         pending_last_name: lastName,
         pending_years_experience: yearsExperience,

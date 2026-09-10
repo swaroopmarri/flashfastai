@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import Razorpay from "razorpay";
 import { createAdminClient } from "@/utils/supabase/admin";
-import { getPlanAndTermByRazorpayPlanId } from "@/lib/pricingPlans";
+import { getPlanAndTermByRazorpayPlanId, getPlanById } from "@/lib/pricingPlans";
+import { getRazorpayClient } from "@/lib/razorpay";
 
 interface RazorpaySubscriptionEntity {
   id: string;
@@ -11,11 +12,61 @@ interface RazorpaySubscriptionEntity {
   current_end?: number | null;
 }
 
+interface RazorpayPaymentEntity {
+  id: string;
+  invoice_id?: string | null;
+}
+
 interface RazorpayWebhookBody {
   event: string;
   payload: {
     subscription?: { entity: RazorpaySubscriptionEntity };
+    payment?: { entity: RazorpayPaymentEntity };
   };
+}
+
+// The referral reward is granted only on true first activation -- see
+// evaluate_referral_reward() in 0019_referral_program.sql for why this is
+// the one event that qualifies (never a renewal, upgrade, or downgrade).
+const REFERRAL_QUALIFYING_EVENT = "subscription.activated";
+
+// Reverses a referral reward if its qualifying payment is later refunded
+// or charged back. Best-effort and NOT verified against a real refund:
+// Razorpay's refund payload carries a payment, not a subscription, so
+// this walks payment -> invoice -> subscription -> organization via the
+// API. invoice_id on the payment entity is documented; subscription_id
+// on the returned invoice is NOT declared anywhere in the razorpay npm
+// package's own type definitions (node_modules/razorpay/dist/types/
+// invoices.d.ts only lists it as a request-side filter, not a response
+// field), so the cast below may simply come back undefined at runtime --
+// in that case this silently no-ops rather than reversing anything.
+// Before relying on this, trigger a real test refund and confirm what
+// the invoice entity actually contains.
+const REFUND_EVENTS = new Set(["payment.refunded", "refund.created"]);
+
+async function reverseReferralForRefund(
+  razorpay: Razorpay,
+  supabase: ReturnType<typeof createAdminClient>,
+  payment: RazorpayPaymentEntity,
+): Promise<void> {
+  if (!payment.invoice_id) return;
+
+  const invoice = await razorpay.invoices.fetch(payment.invoice_id);
+  const subscriptionId = (invoice as unknown as { subscription_id?: string }).subscription_id;
+  if (!subscriptionId) return;
+
+  const { data: subscriptionRow, error } = await supabase
+    .from("subscriptions")
+    .select("organization_id")
+    .eq("razorpay_subscription_id", subscriptionId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!subscriptionRow) return;
+
+  const { error: reverseError } = await supabase.rpc("reverse_referral_reward", {
+    p_organization_id: subscriptionRow.organization_id,
+  });
+  if (reverseError) throw reverseError;
 }
 
 // Events that mean "the customer is now paying for (possibly a new) plan" --
@@ -54,10 +105,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
+  const supabase = createAdminClient();
+
+  if (REFUND_EVENTS.has(body.event)) {
+    const payment = body.payload.payment?.entity;
+    if (payment) {
+      await reverseReferralForRefund(getRazorpayClient(), supabase, payment);
+    }
+    return NextResponse.json({ ok: true });
+  }
+
   const entity = body.payload.subscription?.entity;
   if (!entity) return NextResponse.json({ ok: true });
-
-  const supabase = createAdminClient();
 
   const { data: subscriptionRow, error: lookupError } = await supabase
     .from("subscriptions")
@@ -94,6 +153,16 @@ export async function POST(request: Request) {
       })
       .eq("id", subscriptionRow.organization_id);
     if (quotaError) throw quotaError;
+  }
+
+  if (body.event === REFERRAL_QUALIFYING_EVENT && match) {
+    const starterContacts = getPlanById("starter")!.contacts;
+    const { error: referralError } = await supabase.rpc("evaluate_referral_reward", {
+      p_organization_id: subscriptionRow.organization_id,
+      p_plan_id: match.plan.id,
+      p_reward_contacts: starterContacts,
+    });
+    if (referralError) throw referralError;
   }
 
   if (QUOTA_FREEZE_EVENTS.has(body.event)) {

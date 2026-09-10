@@ -4,7 +4,7 @@ import { ClearUrlParams } from "./ClearUrlParams";
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: { error?: string; message?: string };
+  searchParams: { error?: string; message?: string; ref?: string };
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
@@ -24,7 +24,7 @@ export default function LoginPage({
           </p>
         )}
 
-        <AuthForm />
+        <AuthForm defaultReferralCode={searchParams.ref} />
         <ClearUrlParams shouldClear={Boolean(searchParams.error || searchParams.message)} />
       </div>
     </div>

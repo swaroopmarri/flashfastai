@@ -72,6 +72,14 @@ export async function finalizeSignup(
     p_account_type: accountType,
   });
   if (error) throw error;
+
+  const referralCode = user.user_metadata?.pending_referral_code as string | null | undefined;
+  if (referralCode) {
+    // Invalid/unknown codes and self-referral are silently ignored inside
+    // the RPC itself -- signup must never fail because of a bad code.
+    const { error: referralError } = await supabase.rpc("record_referral", { p_code: referralCode });
+    if (referralError) throw referralError;
+  }
 }
 
 /**

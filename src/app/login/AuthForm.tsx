@@ -8,7 +8,7 @@ const inputClass =
   "mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500";
 const labelClass = "block text-sm font-medium text-gray-700";
 
-export function AuthForm() {
+export function AuthForm({ defaultReferralCode }: { defaultReferralCode?: string }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [accountType, setAccountType] = useState<"individual" | "company">("individual");
 
@@ -178,6 +178,19 @@ export function AuthForm() {
               type="password"
               required
               minLength={6}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="referralCode" className={labelClass}>
+              Referral code (optional)
+            </label>
+            <input
+              id="referralCode"
+              name="referralCode"
+              type="text"
+              defaultValue={defaultReferralCode}
+              placeholder="CM-XXXXXX"
               className={inputClass}
             />
           </div>

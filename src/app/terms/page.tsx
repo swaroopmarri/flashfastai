@@ -108,7 +108,7 @@ export default function TermsPage() {
 
         <section>
           <h2 className="mb-2 text-lg font-medium text-gray-900">
-            6. Fees, billing, and prepayment
+            6. Fees, billing, prepayment, and referral rewards
           </h2>
           <p>
             Paid plans include a fixed monthly allowance of verifications and sends, shared
@@ -135,6 +135,19 @@ export default function TermsPage() {
             organization&apos;s validation and sending allowance until payment is resolved,
             without further notice, and without liability to us for any resulting disruption to
             your campaigns.
+          </p>
+          <p className="mt-2">
+            <strong>
+              Referral rewards have no cash value, cannot be exchanged, transferred, or redeemed
+              for money, and are granted entirely at our discretion.
+            </strong>{" "}
+            We may modify, suspend, or discontinue the referral program at any time without
+            notice, including for accounts already enrolled. We may withhold or reverse a
+            referral reward, and revoke any quota already granted from it, if we suspect fraud,
+            abuse, self-referral through alternate accounts, or any attempt to manipulate the
+            program, and if the qualifying payment is refunded or charged back. Participation in
+            the referral program does not entitle you to any reward, and referral rewards are not
+            a substitute for, and do not affect, your obligations under a paid subscription.
           </p>
         </section>
 
