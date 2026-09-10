@@ -15,6 +15,7 @@ create table if not exists public.referral_codes (
 
 alter table public.referral_codes enable row level security;
 
+drop policy if exists "referral_codes_select_own" on public.referral_codes;
 create policy "referral_codes_select_own" on public.referral_codes
   for select using (user_id = auth.uid());
 
@@ -42,6 +43,7 @@ create table if not exists public.referrals (
 
 alter table public.referrals enable row level security;
 
+drop policy if exists "referrals_select_own" on public.referrals;
 create policy "referrals_select_own" on public.referrals
   for select using (referrer_user_id = auth.uid() or referred_user_id = auth.uid());
 
