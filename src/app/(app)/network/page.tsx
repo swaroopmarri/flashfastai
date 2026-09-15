@@ -19,8 +19,6 @@ const SORT_FIELDS = [
   "total",
   "verified",
   "deliverable",
-  "undeliverable",
-  "risky",
   "pending",
   "unsubscribed",
   "last_verified_at",
@@ -138,8 +136,6 @@ export default async function NetworkPage({
                 <SortHeader field="total" label="Total" activeSort={sort} activeDir={dir} />
                 <SortHeader field="verified" label="Verified" activeSort={sort} activeDir={dir} />
                 <SortHeader field="deliverable" label="Deliverable" activeSort={sort} activeDir={dir} />
-                <SortHeader field="undeliverable" label="Undeliverable" activeSort={sort} activeDir={dir} />
-                <SortHeader field="risky" label="Risky" activeSort={sort} activeDir={dir} />
                 <SortHeader field="pending" label="Pending" activeSort={sort} activeDir={dir} />
                 <SortHeader field="unsubscribed" label="Unsubscribed" activeSort={sort} activeDir={dir} />
                 <SortHeader
@@ -184,10 +180,6 @@ export default async function NetworkPage({
                     <td className="px-3 py-1.5 text-right text-green-700">
                       {d.deliverable || "—"}
                     </td>
-                    <td className="px-3 py-1.5 text-right text-red-700">
-                      {d.undeliverable || "—"}
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-yellow-700">{d.risky || "—"}</td>
                     <td className="px-3 py-1.5 text-right text-gray-600">{d.pending || "—"}</td>
                     <td className="px-3 py-1.5 text-right text-gray-400">
                       {d.unsubscribed || "—"}
