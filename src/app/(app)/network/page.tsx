@@ -107,9 +107,12 @@ export default async function NetworkPage({
   const { data, error } = await supabase.rpc("get_network_domain_counts");
   if (error) throw error;
 
+  const rawDomains = (data ?? []) as DomainCount[];
+  const deliverableDomains = rawDomains.filter((d) => d.deliverable > 0);
+
   const sort: SortField = isSortField(searchParams.sort) ? searchParams.sort : "total";
   const dir: "asc" | "desc" = searchParams.dir === "asc" ? "asc" : "desc";
-  const domains = sortDomains((data ?? []) as DomainCount[], sort, dir);
+  const domains = sortDomains(deliverableDomains, sort, dir);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -121,11 +124,20 @@ export default async function NetworkPage({
 
       {domains.length === 0 ? (
         <p className="text-sm text-gray-500">
-          No contacts yet.{" "}
-          <Link href="/contacts" className="text-indigo-600 hover:underline">
-            Upload a contact list
-          </Link>{" "}
-          to see companies here.
+          {rawDomains.length === 0 ? (
+            <>
+              No contacts yet.{" "}
+              <Link href="/contacts" className="text-indigo-600 hover:underline">
+                Upload a contact list
+              </Link>{" "}
+              to see companies here.
+            </>
+          ) : (
+            <>
+              No companies with deliverable contacts yet. Once a company&apos;s contacts are
+              verified as deliverable, it&apos;ll show up here.
+            </>
+          )}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -177,9 +189,7 @@ export default async function NetworkPage({
                     >
                       {verified}/{d.total}
                     </td>
-                    <td className="px-3 py-1.5 text-right text-green-700">
-                      {d.deliverable || "—"}
-                    </td>
+                    <td className="px-3 py-1.5 text-right text-green-700">{d.deliverable}</td>
                     <td className="px-3 py-1.5 text-right text-gray-600">{d.pending || "—"}</td>
                     <td className="px-3 py-1.5 text-right text-gray-400">
                       {d.unsubscribed || "—"}
