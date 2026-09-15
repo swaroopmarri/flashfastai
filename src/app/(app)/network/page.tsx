@@ -110,8 +110,8 @@ export default async function NetworkPage({
   const rawDomains = (data ?? []) as DomainCount[];
   const deliverableDomains = rawDomains.filter((d) => d.deliverable > 0);
 
-  const sort: SortField = isSortField(searchParams.sort) ? searchParams.sort : "total";
-  const dir: "asc" | "desc" = searchParams.dir === "asc" ? "asc" : "desc";
+  const sort: SortField = isSortField(searchParams.sort) ? searchParams.sort : "company";
+  const dir: "asc" | "desc" = searchParams.dir === "desc" ? "desc" : "asc";
   const domains = sortDomains(deliverableDomains, sort, dir);
 
   return (
@@ -172,7 +172,6 @@ export default async function NetworkPage({
                       >
                         {companyDisplayName(d.domain)}
                       </Link>
-                      <span className="ml-1.5 text-xs text-gray-400">{d.domain}</span>
                       {d.pending > 0 && (
                         <span
                           className="ml-1.5 text-xs font-medium text-yellow-700"
