@@ -116,11 +116,7 @@ export default async function NetworkPage({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="mb-2 text-2xl font-semibold text-gray-900">My Network</h1>
-      <p className="mb-8 text-sm text-gray-500">
-        Every contact across all your lists, grouped by company (email
-        domain), deduplicated by email address.
-      </p>
+      <h1 className="mb-8 text-2xl font-semibold text-gray-900">My Network</h1>
 
       {domains.length === 0 ? (
         <p className="text-sm text-gray-500">
