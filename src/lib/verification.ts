@@ -229,10 +229,10 @@ export async function pollVerificationJob(
   if (zbStatus === "Failed") {
     await supabase
       .from("verification_jobs")
-      .update({ status: "failed", error_message: errorReason || "MillionVerifier reported a failure" })
+      .update({ status: "failed", error_message: errorReason || "Verification failed" })
       .eq("id", jobId);
     job.status = "failed";
-    job.error_message = errorReason || "MillionVerifier reported a failure";
+    job.error_message = errorReason || "Verification failed";
     return toResult();
   }
 

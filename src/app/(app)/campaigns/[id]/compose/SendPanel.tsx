@@ -214,8 +214,6 @@ export function SendPanel({
           </div>
           {state.summary.failedCount > 0 && (
             <p className="text-xs text-gray-500">
-              If your SES account is still in sandbox mode, failures are
-              usually because the recipient address isn&apos;t verified.
               Check the recipient list below for specific reasons.
             </p>
           )}

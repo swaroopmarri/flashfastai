@@ -12,7 +12,7 @@ const FEATURES = [
     emoji: "✅",
     accent: "bg-indigo-100 text-indigo-700",
     description:
-      "Every contact list is checked against MillionVerifier before you send, so you're not paying to email addresses that will just bounce.",
+      "Every contact list is verified before you send, so you're not paying to email addresses that will just bounce.",
   },
   {
     title: "Import your lists",
