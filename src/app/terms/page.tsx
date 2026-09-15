@@ -249,7 +249,7 @@ export default function TermsPage() {
         <section>
           <h2 className="mb-2 text-lg font-medium text-gray-900">15. Contact</h2>
           <p>
-            Questions about these Terms: swaroop.indus@gmail.com · +1 410-670-0167 · Hyderabad, India.
+            Questions about these Terms: admin@campaign-monster.com · +1 410-670-0167 · Hyderabad, India.
           </p>
         </section>
       </div>

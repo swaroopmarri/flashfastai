@@ -123,7 +123,7 @@ export default function PrivacyPage() {
             your account; unsubscribe records are kept indefinitely even
             after a contact is otherwise deleted, since that&apos;s what
             prevents that address from being emailed again by mistake. If
-            you close your account, contact us at swaroop.indus@gmail.com and we&apos;ll
+            you close your account, contact us at admin@campaign-monster.com and we&apos;ll
             delete your account data within a reasonable period, except
             where we&apos;re required to retain something (e.g. billing
             records) for legal or accounting reasons.
@@ -148,7 +148,7 @@ export default function PrivacyPage() {
           <p>
             You can access, export, or delete your contact lists at any time
             from within the app. You can request a copy of your account
-            data, or ask us to delete it, by writing to swaroop.indus@gmail.com.
+            data, or ask us to delete it, by writing to admin@campaign-monster.com.
           </p>
         </section>
 
@@ -163,7 +163,7 @@ export default function PrivacyPage() {
 
         <section>
           <h2 className="mb-2 text-lg font-medium text-gray-900">11. Contact</h2>
-          <p>Questions about this policy: swaroop.indus@gmail.com · +1 410-670-0167 · Hyderabad, India.</p>
+          <p>Questions about this policy: admin@campaign-monster.com · +1 410-670-0167 · Hyderabad, India.</p>
         </section>
       </div>
 
