@@ -62,6 +62,26 @@ export async function createCompanyCampaign(domain: string) {
   redirect(`/campaigns/${campaign.id}/audience`);
 }
 
+/** Drafts only -- a campaign that has ever sent (or is sending/failed) keeps
+ * its record for reporting/history, so this can't touch those statuses. RLS
+ * already scopes the delete to the caller's own campaigns. */
+export async function deleteCampaign(campaignId: string): Promise<void> {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { error } = await supabase
+    .from("campaigns")
+    .delete()
+    .eq("id", campaignId)
+    .eq("status", "draft");
+
+  if (error) throw error;
+  revalidatePath("/campaigns");
+}
+
 export async function updateAudience(campaignId: string, includeRisky: boolean) {
   const supabase = createClient();
   const { error } = await supabase

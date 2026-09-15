@@ -1,13 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-
-const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  sending: "bg-yellow-100 text-yellow-700",
-  sent: "bg-green-100 text-green-700",
-  failed: "bg-red-100 text-red-700",
-};
+import { CampaignRow } from "./CampaignRow";
 
 export default async function CampaignsPage() {
   const supabase = createClient();
@@ -37,19 +31,7 @@ export default async function CampaignsPage() {
       {campaigns && campaigns.length > 0 ? (
         <ul className="divide-y divide-gray-200 rounded-lg border border-gray-200 bg-white shadow-sm">
           {campaigns.map((c) => (
-            <li key={c.id}>
-              <Link
-                href={`/campaigns/${c.id}/${c.status === "draft" ? "audience" : "compose"}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
-              >
-                <span className="font-medium text-gray-900">{c.name}</span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[c.status] ?? "bg-gray-100 text-gray-700"}`}
-                >
-                  {c.status}
-                </span>
-              </Link>
-            </li>
+            <CampaignRow key={c.id} campaign={c} />
           ))}
         </ul>
       ) : (
