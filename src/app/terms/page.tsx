@@ -77,9 +77,9 @@ export default function TermsPage() {
         <section>
           <h2 className="mb-2 text-lg font-medium text-gray-900">4. Verification and sending</h2>
           <p>
-            Email verification is performed by a third-party provider (currently
-            MillionVerifier); campaign sending is performed by a third-party provider (currently
-            Amazon SES). Verification results (deliverable, risky, undeliverable) are
+            Email verification is performed by a third-party provider; campaign sending is
+            performed by a third-party provider. Verification results (deliverable, risky,
+            undeliverable) are
             probabilistic estimates only.{" "}
             <strong>
               We make no guarantee, express or implied, that a &quot;deliverable&quot; result
@@ -87,8 +87,9 @@ export default function TermsPage() {
               any verification or sending provider will be available at any given time.
             </strong>{" "}
             We are not responsible for outages, rate limits, account suspensions, or errors
-            originating from MillionVerifier, Amazon SES, Razorpay, or any other third-party
-            provider the Service relies on, and any interruption to the Service caused by such a
+            originating from our verification provider, our email delivery provider, our payment
+            provider, or any other third-party provider the Service relies on, and any interruption
+            to the Service caused by such a
             provider is not a breach of these Terms.
           </p>
         </section>

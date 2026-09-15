@@ -227,7 +227,7 @@ export default async function OwnerDashboardPage() {
           <p className="text-2xl font-semibold text-gray-900">
             ₹{Math.round(cost30dInr).toLocaleString("en-IN")}
           </p>
-          <p className="text-xs text-gray-400">MillionVerifier + AWS SES, actual usage</p>
+          <p className="text-xs text-gray-400">Verification + email delivery, actual usage</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <p className="text-xs text-gray-500">Est. margin (30d)</p>
