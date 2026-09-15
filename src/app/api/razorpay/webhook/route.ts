@@ -153,6 +153,18 @@ export async function POST(request: Request) {
       })
       .eq("id", subscriptionRow.organization_id);
     if (quotaError) throw quotaError;
+
+    // organizations.plan_*_quota is just the org-wide pool cap -- the
+    // limit actually enforced by try_consume_quota() (and shown on the
+    // customer's dashboard) is memberships.*_quota, which is only ever set
+    // once at signup otherwise. Without this, a real paying customer's own
+    // usable quota would never increase on subscribe/upgrade. See
+    // 0020_sync_solo_membership_quota.sql -- a no-op for multi-member
+    // company accounts, which split the pool manually.
+    const { error: syncError } = await supabase.rpc("sync_solo_membership_quota", {
+      p_organization_id: subscriptionRow.organization_id,
+    });
+    if (syncError) throw syncError;
   }
 
   if (body.event === REFERRAL_QUALIFYING_EVENT && match) {

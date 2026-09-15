@@ -53,6 +53,17 @@ export async function setOrganizationQuota(
     .eq("id", organizationId);
   if (error) throw error;
 
+  // organizations.plan_*_quota is only the org-wide pool cap -- the actual
+  // per-user limit enforced by try_consume_quota() and shown on the
+  // customer's own dashboard is memberships.*_quota, which this doesn't
+  // touch. Keep the two in sync for the common single-member case (see
+  // 0020_sync_solo_membership_quota.sql); a multi-member company account
+  // keeps its admin's manual per-member split untouched.
+  const { error: syncError } = await admin.rpc("sync_solo_membership_quota", {
+    p_organization_id: organizationId,
+  });
+  if (syncError) throw syncError;
+
   revalidatePath("/owner");
 }
 
