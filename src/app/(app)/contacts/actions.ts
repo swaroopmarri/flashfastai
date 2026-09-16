@@ -16,6 +16,19 @@ export interface ParsedContactRow {
   company?: string;
 }
 
+// Large merged files can carry many thousands of rows -- one giant
+// insert/upsert risks the request payload or statement size limits, so
+// writes happen in chunks instead of a single call.
+const CONTACT_WRITE_CHUNK_SIZE = 500;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 function dedupeRows(rows: ParsedContactRow[]): ParsedContactRow[] {
   const byEmail = new Map<string, ParsedContactRow>();
   for (const row of rows) {
@@ -28,6 +41,12 @@ function dedupeRows(rows: ParsedContactRow[]): ParsedContactRow[] {
   return Array.from(byEmail.values());
 }
 
+// Supabase's .in() filter is encoded into the request URL -- an
+// uncapped list (a merged file can easily carry thousands of emails)
+// risks exceeding a proxy's URL-length limit and failing outright with an
+// opaque network error. Chunking keeps every request well under that.
+const SUPPRESSION_CHECK_CHUNK_SIZE = 200;
+
 /** The `unsubscribes` table is the authoritative, user-wide suppression
  * list (see migration 0004) -- checked here so a suppressed email can
  * never re-enter a sendable state just by being re-uploaded into a list
@@ -37,14 +56,17 @@ async function getSuppressedEmails(
   userId: string,
   emails: string[],
 ): Promise<Set<string>> {
-  if (emails.length === 0) return new Set();
-  const { data, error } = await supabase
-    .from("unsubscribes")
-    .select("email")
-    .eq("user_id", userId)
-    .in("email", emails);
-  if (error) throw error;
-  return new Set((data ?? []).map((r) => r.email as string));
+  const suppressed = new Set<string>();
+  for (const batch of chunk(emails, SUPPRESSION_CHECK_CHUNK_SIZE)) {
+    const { data, error } = await supabase
+      .from("unsubscribes")
+      .select("email")
+      .eq("user_id", userId)
+      .in("email", batch);
+    if (error) throw error;
+    for (const r of data ?? []) suppressed.add(r.email as string);
+  }
+  return suppressed;
 }
 
 /** Client-side preview check, called right after parsing a file so the
@@ -92,9 +114,9 @@ export async function createContactList(name: string, rows: ParsedContactRow[]) 
   );
   const importable = deduped.filter((r) => !suppressed.has(r.email));
 
-  if (importable.length > 0) {
+  for (const batch of chunk(importable, CONTACT_WRITE_CHUNK_SIZE)) {
     const { error: contactsError } = await supabase.from("contacts").insert(
-      importable.map((row) => ({
+      batch.map((row) => ({
         contact_list_id: list.id,
         email: row.email,
         name: row.name || null,
@@ -128,9 +150,9 @@ export async function mergeContacts(listId: string, rows: ParsedContactRow[]) {
   );
   const importable = deduped.filter((r) => !suppressed.has(r.email));
 
-  if (importable.length > 0) {
+  for (const batch of chunk(importable, CONTACT_WRITE_CHUNK_SIZE)) {
     const { error } = await supabase.from("contacts").upsert(
-      importable.map((row) => ({
+      batch.map((row) => ({
         contact_list_id: listId,
         email: row.email,
         name: row.name || null,
