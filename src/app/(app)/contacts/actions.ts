@@ -16,10 +16,11 @@ export interface ParsedContactRow {
   company?: string;
 }
 
-// Large merged files can carry many thousands of rows -- one giant
-// insert/upsert risks the request payload or statement size limits, so
-// writes happen in chunks instead of a single call.
-const CONTACT_WRITE_CHUNK_SIZE = 500;
+// Postgres/PostgREST accept a large insert/upsert payload in one request
+// (it's a POST body, not a URL) -- unlike the suppression lookup below,
+// this size is only about keeping any single request reasonably sized.
+const CONTACT_WRITE_CHUNK_SIZE = 1000;
+const CONTACT_WRITE_CONCURRENCY = 4;
 
 function chunk<T>(items: T[], size: number): T[][] {
   const chunks: T[][] = [];
@@ -27,6 +28,26 @@ function chunk<T>(items: T[], size: number): T[][] {
     chunks.push(items.slice(i, i + size));
   }
   return chunks;
+}
+
+/** Runs `fn` over every item in `chunks`, at most `concurrency` in flight at
+ * once. A large merged file can produce well over a hundred chunks -- doing
+ * them one at a time would each add a full network round trip in serial and
+ * risk the function's own execution-time limit long before any single
+ * request is actually too large. */
+async function runChunked<T>(
+  chunks: T[][],
+  concurrency: number,
+  fn: (chunk: T[]) => Promise<void>,
+): Promise<void> {
+  let next = 0;
+  async function worker() {
+    while (next < chunks.length) {
+      const chunk = chunks[next++];
+      await fn(chunk);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, chunks.length) }, worker));
 }
 
 function dedupeRows(rows: ParsedContactRow[]): ParsedContactRow[] {
@@ -46,6 +67,7 @@ function dedupeRows(rows: ParsedContactRow[]): ParsedContactRow[] {
 // risks exceeding a proxy's URL-length limit and failing outright with an
 // opaque network error. Chunking keeps every request well under that.
 const SUPPRESSION_CHECK_CHUNK_SIZE = 200;
+const SUPPRESSION_CHECK_CONCURRENCY = 8;
 
 /** The `unsubscribes` table is the authoritative, user-wide suppression
  * list (see migration 0004) -- checked here so a suppressed email can
@@ -57,15 +79,19 @@ async function getSuppressedEmails(
   emails: string[],
 ): Promise<Set<string>> {
   const suppressed = new Set<string>();
-  for (const batch of chunk(emails, SUPPRESSION_CHECK_CHUNK_SIZE)) {
-    const { data, error } = await supabase
-      .from("unsubscribes")
-      .select("email")
-      .eq("user_id", userId)
-      .in("email", batch);
-    if (error) throw error;
-    for (const r of data ?? []) suppressed.add(r.email as string);
-  }
+  await runChunked(
+    chunk(emails, SUPPRESSION_CHECK_CHUNK_SIZE),
+    SUPPRESSION_CHECK_CONCURRENCY,
+    async (batch) => {
+      const { data, error } = await supabase
+        .from("unsubscribes")
+        .select("email")
+        .eq("user_id", userId)
+        .in("email", batch);
+      if (error) throw error;
+      for (const r of data ?? []) suppressed.add(r.email as string);
+    },
+  );
   return suppressed;
 }
 
@@ -114,7 +140,7 @@ export async function createContactList(name: string, rows: ParsedContactRow[]) 
   );
   const importable = deduped.filter((r) => !suppressed.has(r.email));
 
-  for (const batch of chunk(importable, CONTACT_WRITE_CHUNK_SIZE)) {
+  await runChunked(chunk(importable, CONTACT_WRITE_CHUNK_SIZE), CONTACT_WRITE_CONCURRENCY, async (batch) => {
     const { error: contactsError } = await supabase.from("contacts").insert(
       batch.map((row) => ({
         contact_list_id: list.id,
@@ -124,7 +150,7 @@ export async function createContactList(name: string, rows: ParsedContactRow[]) 
       })),
     );
     if (contactsError) throw contactsError;
-  }
+  });
 
   revalidatePath("/contacts");
   redirect(`/contacts/${list.id}`);
@@ -150,7 +176,7 @@ export async function mergeContacts(listId: string, rows: ParsedContactRow[]) {
   );
   const importable = deduped.filter((r) => !suppressed.has(r.email));
 
-  for (const batch of chunk(importable, CONTACT_WRITE_CHUNK_SIZE)) {
+  await runChunked(chunk(importable, CONTACT_WRITE_CHUNK_SIZE), CONTACT_WRITE_CONCURRENCY, async (batch) => {
     const { error } = await supabase.from("contacts").upsert(
       batch.map((row) => ({
         contact_list_id: listId,
@@ -161,7 +187,7 @@ export async function mergeContacts(listId: string, rows: ParsedContactRow[]) {
       { onConflict: "contact_list_id,email", ignoreDuplicates: false },
     );
     if (error) throw error;
-  }
+  });
 
   revalidatePath(`/contacts/${listId}`);
 }

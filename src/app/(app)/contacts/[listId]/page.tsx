@@ -5,6 +5,11 @@ import { UploadForm } from "../UploadForm";
 import { VerifyPanel } from "../../_components/VerifyPanel";
 import { companyDisplayName } from "@/lib/companyName";
 
+// A large merged file's mergeContacts call chunks many DB round trips (see
+// ../actions.ts) -- give this route's serverless function more than the
+// platform default (often ~10-15s) to finish them all.
+export const maxDuration = 60;
+
 const STATUS_STYLES: Record<string, string> = {
   pending_verification: "bg-gray-100 text-gray-700",
   deliverable: "bg-green-100 text-green-700",

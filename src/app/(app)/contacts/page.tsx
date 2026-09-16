@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { UploadForm } from "./UploadForm";
 
+// A large merged file's createContactList call chunks many DB round trips
+// (see ./actions.ts) -- give this route's serverless function more than
+// the platform default (often ~10-15s) to finish them all.
+export const maxDuration = 60;
+
 const STATUS_LABELS: Record<string, string> = {
   deliverable: "deliverable",
   risky: "risky",
