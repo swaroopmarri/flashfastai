@@ -15,6 +15,19 @@ export interface CampaignListItem {
   id: string;
   name: string;
   status: string;
+  createdAt: string;
+  sentAt: string | null;
+  audienceLabel: string | null;
+  sentCount: number | null;
+  totalRecipients: number | null;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function CampaignRow({ campaign }: { campaign: CampaignListItem }) {
@@ -32,19 +45,31 @@ export function CampaignRow({ campaign }: { campaign: CampaignListItem }) {
     });
   }
 
+  const detailParts = [
+    campaign.audienceLabel,
+    `Created ${formatDate(campaign.createdAt)}`,
+    campaign.sentAt ? `Sent ${formatDate(campaign.sentAt)}` : null,
+    campaign.totalRecipients !== null
+      ? `${campaign.sentCount ?? 0}/${campaign.totalRecipients} sent`
+      : null,
+  ].filter(Boolean);
+
   return (
     <li>
       <div className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
         <Link
           href={`/campaigns/${campaign.id}/${campaign.status === "draft" ? "audience" : "compose"}`}
-          className="flex flex-1 items-center gap-3"
+          className="flex-1"
         >
-          <span className="font-medium text-gray-900">{campaign.name}</span>
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[campaign.status] ?? "bg-gray-100 text-gray-700"}`}
-          >
-            {campaign.status}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="font-medium text-gray-900">{campaign.name}</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[campaign.status] ?? "bg-gray-100 text-gray-700"}`}
+            >
+              {campaign.status}
+            </span>
+          </div>
+          <p className="mt-0.5 text-xs text-gray-500">{detailParts.join(" · ")}</p>
         </Link>
         {campaign.status === "draft" && (
           <button
