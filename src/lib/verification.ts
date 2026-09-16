@@ -109,6 +109,25 @@ async function startVerificationForScope(
     return { mode: "quota_exceeded", message: NOT_ACTIVE_MESSAGE };
   }
 
+  // try_consume_quota() is all-or-nothing: it only succeeds if the FULL
+  // amount requested fits. Now that fetchPendingEmails() returns every
+  // pending contact (not just the first page), asking to consume quota for
+  // all of them at once would block verification entirely for a large list
+  // sitting on a smaller remaining quota, even though the account could
+  // afford to verify part of it right now. Cap what's requested to the
+  // membership's own remaining quota first, so a big list gets verified in
+  // as many quota-affordable rounds as it takes -- this is the same
+  // enforcement, just requested in a size that can actually succeed;
+  // try_consume_quota() still re-checks (and is the real authority on) the
+  // org-level shared pool underneath it.
+  const remaining = Math.max(0, membership.validation_quota - membership.validation_used);
+  if (remaining === 0) {
+    return { mode: "quota_exceeded", message: QUOTA_EXCEEDED_MESSAGE };
+  }
+  if (emails.length > remaining) {
+    emails.length = remaining;
+  }
+
   const { data: quotaOk, error: quotaError } = await supabase.rpc("try_consume_quota", {
     p_kind: "validation",
     p_amount: emails.length,
