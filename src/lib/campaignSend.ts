@@ -90,6 +90,27 @@ export async function startCampaignSend(
     };
   }
 
+  // Unlike verification (where an under-quota request can simply be
+  // capped and the rest verified next click, since contacts stay
+  // "pending" until then), a campaign send is one-shot: whatever subset
+  // of recipients gets inserted into campaign_recipients here is all this
+  // campaign will EVER send to -- once that job finishes, the campaign is
+  // marked "sent" for good, with no mechanism to come back for anyone left
+  // out. So a send can't be silently truncated to fit remaining quota the
+  // way verification is; it either goes to the full audience or is
+  // blocked entirely, with a message that names the actual numbers so the
+  // block isn't a mystery.
+  const remaining = Math.max(0, membership.send_quota - membership.send_used);
+  if (recipients.length > remaining) {
+    return {
+      mode: "blocked",
+      message:
+        remaining > 0
+          ? `This campaign has ${recipients.length} eligible recipients, but you only have ${remaining} sends left this month. Reduce the audience, wait for your quota to reset, or contact your admin to increase it.`
+          : "You've used your monthly send limit. Contact your admin to increase it.",
+    };
+  }
+
   const { data: quotaOk, error: quotaError } = await supabase.rpc("try_consume_quota", {
     p_kind: "send",
     p_amount: recipients.length,
