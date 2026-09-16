@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { UploadForm } from "../UploadForm";
 import { VerifyPanel } from "../../_components/VerifyPanel";
 import { companyDisplayName } from "@/lib/companyName";
+import { fetchAllRows } from "@/lib/supabasePagination";
 
 // A large merged file's mergeContacts call chunks many DB round trips (see
 // ../actions.ts) -- give this route's serverless function more than the
@@ -81,13 +82,14 @@ export default async function ContactListPage({
 
   if (!list) notFound();
 
-  const { data: contacts, error } = await supabase
-    .from("contacts")
-    .select("id, email, name, company, status")
-    .eq("contact_list_id", params.listId)
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
+  const contacts = await fetchAllRows<ContactRow>((from, to) =>
+    supabase
+      .from("contacts")
+      .select("id, email, name, company, status")
+      .eq("contact_list_id", params.listId)
+      .order("created_at", { ascending: false })
+      .range(from, to),
+  );
 
   const { data: activeJob } = await supabase
     .from("verification_jobs")
@@ -97,12 +99,9 @@ export default async function ContactListPage({
     .order("created_at", { ascending: false })
     .maybeSingle();
 
-  const pendingCount =
-    contacts?.filter((c) => c.status === "pending_verification").length ?? 0;
+  const pendingCount = contacts.filter((c) => c.status === "pending_verification").length;
 
-  const { sorted: sortedContacts, counts: groupCounts } = sortAndGroupContacts(
-    contacts ?? [],
-  );
+  const { sorted: sortedContacts, counts: groupCounts } = sortAndGroupContacts(contacts);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -122,7 +121,7 @@ export default async function ContactListPage({
       </div>
 
       <h2 className="mb-3 text-lg font-medium text-gray-900">
-        Contacts ({contacts?.length ?? 0})
+        Contacts ({contacts.length})
       </h2>
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-gray-200 text-sm">

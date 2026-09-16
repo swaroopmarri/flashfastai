@@ -4,6 +4,13 @@ import { createClient } from "@/utils/supabase/server";
 import { VerifyPanel } from "../../_components/VerifyPanel";
 import { createCompanyCampaign } from "../../campaigns/actions";
 import { companyDisplayName } from "@/lib/companyName";
+import { fetchAllRows } from "@/lib/supabasePagination";
+
+// A company with many contacts needs several paginated reads to fetch in
+// full (see fetchAllRows), and "Verify all unverified" here can trigger the
+// same for pending emails -- give this route's serverless function more
+// than the platform default (often ~10-15s) to finish them all.
+export const maxDuration = 60;
 
 const STATUS_STYLES: Record<string, string> = {
   pending_verification: "bg-gray-100 text-gray-700",
@@ -33,12 +40,9 @@ export default async function NetworkDomainPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data, error } = await supabase.rpc("get_network_domain_contacts", {
-    p_domain: domain,
-  });
-  if (error) throw error;
-
-  const contacts = (data ?? []) as DomainContact[];
+  const contacts = await fetchAllRows<DomainContact>((from, to) =>
+    supabase.rpc("get_network_domain_contacts", { p_domain: domain }).range(from, to),
+  );
   const pendingCount = contacts.filter((c) => c.status === "pending_verification").length;
   const verifiedCount = contacts.length - pendingCount;
 

@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
+import { fetchAllRows } from "@/lib/supabasePagination";
 import { ComposeForm } from "./ComposeForm";
 import { SendPanel } from "./SendPanel";
+
+// A large audience needs several paginated reads to fetch in full (see
+// fetchAllRows) -- give this route's serverless function more than the
+// platform default (often ~10-15s) to finish them all.
+export const maxDuration = 60;
 
 export default async function ComposePage({
   params,
@@ -26,24 +32,25 @@ export default async function ComposePage({
   if (!campaign || (!campaign.contact_list_id && !campaign.company_domain)) notFound();
 
   const statuses = campaign.include_risky ? ["deliverable", "risky"] : ["deliverable"];
-  let eligibleQuery = supabase.from("contacts").select("email").in("status", statuses);
-  eligibleQuery = campaign.contact_list_id
-    ? eligibleQuery.eq("contact_list_id", campaign.contact_list_id)
-    : eligibleQuery.ilike("email", `%@${campaign.company_domain}`);
-  const { data: eligibleContacts, error: contactsError } = await eligibleQuery;
-  if (contactsError) throw contactsError;
+  const eligibleContacts = await fetchAllRows<{ email: string }>((from, to) => {
+    let query = supabase.from("contacts").select("email").in("status", statuses);
+    query = campaign.contact_list_id
+      ? query.eq("contact_list_id", campaign.contact_list_id)
+      : query.ilike("email", `%@${campaign.company_domain}`);
+    return query.range(from, to);
+  });
 
-  const { data: unsubs, error: unsubError } = await supabase
-    .from("unsubscribes")
-    .select("email")
-    .eq("user_id", campaign.user_id);
-  if (unsubError) throw unsubError;
-  const unsubSet = new Set((unsubs ?? []).map((u) => u.email));
+  const unsubs = await fetchAllRows<{ email: string }>((from, to) =>
+    supabase
+      .from("unsubscribes")
+      .select("email")
+      .eq("user_id", campaign.user_id)
+      .range(from, to),
+  );
+  const unsubSet = new Set(unsubs.map((u) => u.email));
 
   const recipientCount = new Set(
-    (eligibleContacts ?? [])
-      .map((c) => c.email.toLowerCase())
-      .filter((email) => !unsubSet.has(email)),
+    eligibleContacts.map((c) => c.email.toLowerCase()).filter((email) => !unsubSet.has(email)),
   ).size;
 
   const { data: latestJob } = await supabase

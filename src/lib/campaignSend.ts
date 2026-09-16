@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
 import { sendCampaignEmail } from "@/lib/ses";
 import { getCurrentMembership } from "@/lib/organizations";
+import { fetchAllRows } from "@/lib/supabasePagination";
 
 const BATCH_SIZE = 10;
 
@@ -44,19 +45,22 @@ export async function startCampaignSend(
   }
 
   const statuses = campaign.include_risky ? ["deliverable", "risky"] : ["deliverable"];
-  let contactsQuery = supabase.from("contacts").select("id, email").in("status", statuses);
-  contactsQuery = campaign.contact_list_id
-    ? contactsQuery.eq("contact_list_id", campaign.contact_list_id)
-    : contactsQuery.ilike("email", `%@${campaign.company_domain}`);
-  const { data: contacts, error: contactsError } = await contactsQuery;
-  if (contactsError) throw contactsError;
+  const contacts = await fetchAllRows<{ id: string; email: string }>((from, to) => {
+    let query = supabase.from("contacts").select("id, email").in("status", statuses);
+    query = campaign.contact_list_id
+      ? query.eq("contact_list_id", campaign.contact_list_id)
+      : query.ilike("email", `%@${campaign.company_domain}`);
+    return query.range(from, to);
+  });
 
-  const { data: unsubs, error: unsubError } = await supabase
-    .from("unsubscribes")
-    .select("email")
-    .eq("user_id", campaign.user_id);
-  if (unsubError) throw unsubError;
-  const unsubSet = new Set((unsubs ?? []).map((u) => u.email as string));
+  const unsubs = await fetchAllRows<{ email: string }>((from, to) =>
+    supabase
+      .from("unsubscribes")
+      .select("email")
+      .eq("user_id", campaign.user_id)
+      .range(from, to),
+  );
+  const unsubSet = new Set(unsubs.map((u) => u.email));
 
   // A domain-scoped audience can return the same email more than once (it
   // exists in several of the user's lists) -- dedupe so we never email the
@@ -64,11 +68,11 @@ export async function startCampaignSend(
   // are already unique per the DB constraint, so this is a no-op there.
   const seen = new Set<string>();
   const recipients: { id: string; email: string }[] = [];
-  for (const c of contacts ?? []) {
-    const email = (c.email as string).toLowerCase();
+  for (const c of contacts) {
+    const email = c.email.toLowerCase();
     if (unsubSet.has(email) || seen.has(email)) continue;
     seen.add(email);
-    recipients.push({ id: c.id as string, email });
+    recipients.push({ id: c.id, email });
   }
 
   if (recipients.length === 0) {

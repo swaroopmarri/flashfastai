@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { companyDisplayName } from "@/lib/companyName";
+import { fetchAllRows } from "@/lib/supabasePagination";
 
 interface DomainCount {
   domain: string;
@@ -106,10 +107,9 @@ export default async function NetworkPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data, error } = await supabase.rpc("get_network_domain_counts");
-  if (error) throw error;
-
-  const rawDomains = (data ?? []) as DomainCount[];
+  const rawDomains = await fetchAllRows<DomainCount>((from, to) =>
+    supabase.rpc("get_network_domain_counts").range(from, to),
+  );
   const deliverableDomains = rawDomains.filter((d) => d.deliverable > 0);
 
   const sort: SortField = isSortField(searchParams.sort) ? searchParams.sort : "company";

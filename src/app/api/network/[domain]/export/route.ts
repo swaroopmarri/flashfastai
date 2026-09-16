@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
+import { fetchAllRows } from "@/lib/supabasePagination";
 
 interface DomainContact {
   email: string;
@@ -9,6 +10,11 @@ interface DomainContact {
   status: string;
   list_names: string[] | null;
 }
+
+// Exporting a large company needs several paginated reads to fetch in full
+// (see fetchAllRows) -- give this route's serverless function more than
+// the platform default (often ~10-15s) to finish them all.
+export const maxDuration = 60;
 
 export async function GET(
   _request: Request,
@@ -25,17 +31,21 @@ export async function GET(
 
   // Reuses the same deduplicated, "best status" query the /network/[domain]
   // page itself is built from, so the exported CSV matches what's on screen.
-  const { data: contacts, error } = await supabase.rpc("get_network_domain_contacts", {
-    p_domain: domain,
-  });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  let contacts: DomainContact[];
+  try {
+    contacts = await fetchAllRows<DomainContact>((from, to) =>
+      supabase.rpc("get_network_domain_contacts", { p_domain: domain }).range(from, to),
+    );
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Export failed" },
+      { status: 500 },
+    );
   }
 
   const csv = Papa.unparse({
     fields: ["email", "name", "company", "status", "lists"],
-    data: ((contacts ?? []) as DomainContact[]).map((c) => [
+    data: contacts.map((c) => [
       c.email,
       c.name ?? "",
       c.company ?? "",

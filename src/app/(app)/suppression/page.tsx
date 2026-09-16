@@ -1,6 +1,12 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { ResubscribeButton } from "../_components/ResubscribeButton";
+import { fetchAllRows } from "@/lib/supabasePagination";
+
+// A large account's suppression lists need several paginated reads to
+// fetch in full (see fetchAllRows) -- give this route's serverless
+// function more than the platform default (often ~10-15s) to finish.
+export const maxDuration = 60;
 
 interface UndeliverableRow {
   email: string;
@@ -56,20 +62,26 @@ export default async function SuppressionPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const [{ data: undeliverableData, error: undeliverableError }, { data: unsubData, error: unsubError }] =
-    await Promise.all([
-      supabase.from("contacts").select("email, zerobounce_sub_status").eq("status", "undeliverable"),
+  const [undeliverableData, unsubData] = await Promise.all([
+    fetchAllRows<UndeliverableRow>((from, to) =>
+      supabase
+        .from("contacts")
+        .select("email, zerobounce_sub_status")
+        .eq("status", "undeliverable")
+        .range(from, to),
+    ),
+    fetchAllRows<unknown>((from, to) =>
       supabase
         .from("unsubscribes")
         .select("email, unsubscribed_at, reason, campaigns(name)")
         .eq("user_id", user.id)
-        .order("unsubscribed_at", { ascending: false }),
-    ]);
-  if (undeliverableError) throw undeliverableError;
-  if (unsubError) throw unsubError;
+        .order("unsubscribed_at", { ascending: false })
+        .range(from, to),
+    ),
+  ]);
 
-  const bounceGroups = groupByReason(dedupeByEmail((undeliverableData ?? []) as UndeliverableRow[]));
-  const allUnsubs = (unsubData ?? []) as unknown as UnsubscribeRow[];
+  const bounceGroups = groupByReason(dedupeByEmail(undeliverableData));
+  const allUnsubs = unsubData as unknown as UnsubscribeRow[];
   const unsubscribed = allUnsubs.filter((r) => r.reason !== "complaint");
   const complaints = allUnsubs.filter((r) => r.reason === "complaint");
 

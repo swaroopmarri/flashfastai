@@ -7,6 +7,7 @@ import {
   type SimplifiedStatus,
 } from "@/lib/millionverifier";
 import { getCurrentMembership } from "@/lib/organizations";
+import { fetchAllRows } from "@/lib/supabasePagination";
 
 // NOTE: the `contacts.zerobounce_sub_status` / `verification_jobs.zerobounce_file_id`
 // DB column names predate the switch to MillionVerifier and are kept as-is
@@ -75,22 +76,19 @@ async function fetchPendingEmails(
   supabase: SupabaseClient,
   scope: VerificationScope,
 ): Promise<string[]> {
-  let query = supabase.from("contacts").select("email").eq("status", "pending_verification");
-
-  query =
-    scope.type === "list"
-      ? query.eq("contact_list_id", scope.contactListId)
-      : query.ilike("email", `%@${scope.domain}`);
-
-  const { data, error } = await query;
-  if (error) throw error;
+  const rows = await fetchAllRows<{ email: string }>((from, to) => {
+    let query = supabase.from("contacts").select("email").eq("status", "pending_verification");
+    query =
+      scope.type === "list"
+        ? query.eq("contact_list_id", scope.contactListId)
+        : query.ilike("email", `%@${scope.domain}`);
+    return query.range(from, to);
+  });
 
   // Company scope can return the same email more than once (present in
   // multiple lists) -- dedupe so we don't pay quota or call MillionVerifier
   // twice for one address.
-  return Array.from(
-    new Set((data ?? []).map((c) => (c.email as string).trim().toLowerCase())),
-  );
+  return Array.from(new Set(rows.map((r) => r.email.trim().toLowerCase())));
 }
 
 async function startVerificationForScope(
