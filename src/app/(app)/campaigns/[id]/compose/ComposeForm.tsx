@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { updateCampaignContent } from "../../actions";
 import { RichTextEditor } from "./RichTextEditor";
+import { registerIdleAutosave } from "@/lib/idleAutosave";
 
 export function ComposeForm({
   campaignId,
@@ -31,17 +32,40 @@ export function ComposeForm({
     setSaved(false);
   }
 
+  async function save() {
+    await updateCampaignContent(campaignId, subject, body, replyTo);
+    setSaved(true);
+  }
+
   function handleSave() {
     setError(null);
     startTransition(async () => {
       try {
-        await updateCampaignContent(campaignId, subject, body, replyTo);
-        setSaved(true);
+        await save();
       } catch (e) {
         setError(e instanceof Error ? e.message : "Could not save.");
       }
     });
   }
+
+  // Registered once so the 30-minute idle logout can save an in-progress
+  // draft before it signs the user out -- reads the latest values via a
+  // ref rather than re-registering (and thrashing the shared callback set)
+  // on every keystroke.
+  const latestRef = useRef({ subject, body, replyTo, saved, uploadingImage });
+  latestRef.current = { subject, body, replyTo, saved, uploadingImage };
+
+  useEffect(() => {
+    return registerIdleAutosave(async () => {
+      const current = latestRef.current;
+      if (current.saved || current.uploadingImage) return;
+      try {
+        await updateCampaignContent(campaignId, current.subject, current.body, current.replyTo);
+      } catch {
+        // Best-effort: a failed autosave shouldn't block the idle sign-out.
+      }
+    });
+  }, [campaignId]);
 
   const isBodyEmpty = !body.replace(/<[^>]+>/g, "").trim();
 

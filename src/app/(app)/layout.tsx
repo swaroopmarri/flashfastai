@@ -7,6 +7,7 @@ import { isPlatformOwner } from "@/lib/ownerAccess";
 import { logout } from "./dashboard/actions";
 import { NavLink } from "./NavLink";
 import { WhatsAppButton } from "./_components/WhatsAppButton";
+import { IdleLogout } from "./_components/IdleLogout";
 
 export default async function AppLayout({
   children,
@@ -77,6 +78,7 @@ export default async function AppLayout({
       </header>
       <main>{children}</main>
       {!isPlatformOwner(user.email) && <WhatsAppButton />}
+      <IdleLogout />
     </div>
   );
 }
