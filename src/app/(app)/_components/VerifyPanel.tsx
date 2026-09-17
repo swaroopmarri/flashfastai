@@ -17,8 +17,8 @@ interface Summary {
 type PanelState =
   | { phase: "idle" }
   | { phase: "starting" }
-  | { phase: "polling"; submittedCount: number; leftoverPending: number }
-  | { phase: "done"; summary: Summary; leftoverPending: number }
+  | { phase: "polling"; submittedCount: number; leftoverPending: number; reusedCount: number }
+  | { phase: "done"; summary: Summary; leftoverPending: number; reusedCount: number }
   | { phase: "error"; message: string };
 
 const POLL_INTERVAL_MS = 6000;
@@ -37,7 +37,9 @@ export function VerifyPanel({
   buttonLabel?: string;
 }) {
   const [state, setState] = useState<PanelState>(
-    activeJobId ? { phase: "polling", submittedCount: pendingCount, leftoverPending: 0 } : { phase: "idle" },
+    activeJobId
+      ? { phase: "polling", submittedCount: pendingCount, leftoverPending: 0, reusedCount: 0 }
+      : { phase: "idle" },
   );
   const jobIdRef = useRef<string | null>(activeJobId);
   const router = useRouter();
@@ -59,6 +61,7 @@ export function VerifyPanel({
             phase: "done",
             summary: data.summary,
             leftoverPending: prev.phase === "polling" ? prev.leftoverPending : 0,
+            reusedCount: prev.phase === "polling" ? prev.reusedCount : 0,
           }));
           router.refresh();
         } else if (data.status === "failed") {
@@ -66,7 +69,12 @@ export function VerifyPanel({
         } else {
           setState((prev) =>
             prev.phase === "polling"
-              ? { phase: "polling", submittedCount: data.totalContacts, leftoverPending: prev.leftoverPending }
+              ? {
+                  phase: "polling",
+                  submittedCount: data.totalContacts,
+                  leftoverPending: prev.leftoverPending,
+                  reusedCount: prev.reusedCount,
+                }
               : prev,
           );
           setTimeout(poll, POLL_INTERVAL_MS);
@@ -96,7 +104,12 @@ export function VerifyPanel({
       } else if (result.mode === "quota_exceeded") {
         setState({ phase: "error", message: result.message });
       } else if (result.mode === "single") {
-        setState({ phase: "done", summary: result.summary, leftoverPending: result.leftoverPending });
+        setState({
+          phase: "done",
+          summary: result.summary,
+          leftoverPending: result.leftoverPending,
+          reusedCount: result.reusedCount,
+        });
         router.refresh();
       } else {
         jobIdRef.current = result.jobId;
@@ -104,6 +117,7 @@ export function VerifyPanel({
           phase: "polling",
           submittedCount: result.submittedCount,
           leftoverPending: result.leftoverPending,
+          reusedCount: result.reusedCount,
         });
       }
     } catch (e) {
@@ -116,6 +130,7 @@ export function VerifyPanel({
 
   const leftoverPending =
     state.phase === "polling" || state.phase === "done" ? state.leftoverPending : 0;
+  const reusedCount = state.phase === "polling" || state.phase === "done" ? state.reusedCount : 0;
 
   return (
     <div>
@@ -147,6 +162,13 @@ export function VerifyPanel({
             verification continues in the background.
           </p>
         </div>
+      )}
+
+      {reusedCount > 0 && (state.phase === "polling" || state.phase === "done") && (
+        <p className="mt-2 text-xs text-gray-500">
+          {reusedCount} contact{reusedCount === 1 ? "" : "s"} already had a result from elsewhere
+          in your account — updated instantly, no quota used.
+        </p>
       )}
 
       {leftoverPending > 0 && (state.phase === "polling" || state.phase === "done") && (

@@ -29,8 +29,14 @@ export interface VerificationSummary {
 export type StartVerificationResult =
   | { mode: "none" }
   | { mode: "quota_exceeded"; message: string }
-  | { mode: "single"; summary: VerificationSummary; submittedCount: number; leftoverPending: number }
-  | { mode: "bulk"; jobId: string; submittedCount: number; leftoverPending: number };
+  | {
+      mode: "single";
+      summary: VerificationSummary;
+      submittedCount: number;
+      leftoverPending: number;
+      reusedCount: number;
+    }
+  | { mode: "bulk"; jobId: string; submittedCount: number; leftoverPending: number; reusedCount: number };
 
 const QUOTA_EXCEEDED_MESSAGE =
   "You've used your monthly validation limit. Contact your admin to increase it.";
@@ -91,13 +97,91 @@ async function fetchPendingEmails(
   return Array.from(new Set(rows.map((r) => r.email.trim().toLowerCase())));
 }
 
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+// .in() is encoded into the request URL, so each chunk stays well under
+// any proxy's URL-length limit -- and since the result can never exceed
+// the input chunk's size, no further pagination is needed on the read side.
+const KNOWN_RESULT_CHECK_CHUNK_SIZE = 200;
+
+/**
+ * Finds pending emails that already have a real result (deliverable/risky/
+ * undeliverable) somewhere ELSE in the account -- e.g. the same address
+ * exists in another list that was already verified. There's no reason to
+ * pay MillionVerifier again for an address whose answer we already have;
+ * this reuses that known result instead. RLS already scopes `contacts` to
+ * the caller's own rows, so this naturally can't see another customer's
+ * data.
+ */
+async function findKnownResults(
+  supabase: SupabaseClient,
+  emails: string[],
+): Promise<Map<string, { status: SimplifiedStatus; subStatus: string | null }>> {
+  const known = new Map<string, { status: SimplifiedStatus; subStatus: string | null }>();
+  for (const batch of chunk(emails, KNOWN_RESULT_CHECK_CHUNK_SIZE)) {
+    const { data, error } = await supabase
+      .from("contacts")
+      .select("email, status, zerobounce_sub_status, verified_at")
+      .in("email", batch)
+      .neq("status", "pending_verification")
+      .order("verified_at", { ascending: false });
+    if (error) throw error;
+    for (const row of data ?? []) {
+      const email = (row.email as string).trim().toLowerCase();
+      // Rows are ordered newest-verified-first, so the first one seen per
+      // email is the most recent known result -- keep that one.
+      if (!known.has(email)) {
+        known.set(email, {
+          status: row.status as SimplifiedStatus,
+          subStatus: row.zerobounce_sub_status as string | null,
+        });
+      }
+    }
+  }
+  return known;
+}
+
 async function startVerificationForScope(
   supabase: SupabaseClient,
   scope: VerificationScope,
 ): Promise<StartVerificationResult> {
-  const emails = await fetchPendingEmails(supabase, scope);
+  let emails = await fetchPendingEmails(supabase, scope);
   if (emails.length === 0) {
     return { mode: "none" };
+  }
+
+  // Reuse any result we already have for these addresses from elsewhere in
+  // the account before spending quota or calling MillionVerifier at all.
+  const known = await findKnownResults(supabase, emails);
+  let reusedSummary: VerificationSummary = { deliverable: 0, risky: 0, undeliverable: 0 };
+  if (known.size > 0) {
+    reusedSummary = await applyResults(
+      supabase,
+      scope,
+      Array.from(known.entries()).map(([email, r]) => ({
+        email,
+        status: r.status,
+        subStatus: r.subStatus,
+      })),
+    );
+    emails = emails.filter((e) => !known.has(e));
+  }
+  const reusedCount = known.size;
+
+  if (emails.length === 0) {
+    return {
+      mode: "single",
+      summary: reusedSummary,
+      submittedCount: 0,
+      leftoverPending: 0,
+      reusedCount,
+    };
   }
 
   // try_consume_quota() only matches memberships with status = 'active' and
@@ -151,7 +235,12 @@ async function startVerificationForScope(
 
   if (emails.length <= BULK_THRESHOLD) {
     const results = await validateBatch(emails);
-    const summary = await applyResults(supabase, scope, results);
+    const freshSummary = await applyResults(supabase, scope, results);
+    const summary: VerificationSummary = {
+      deliverable: freshSummary.deliverable + reusedSummary.deliverable,
+      risky: freshSummary.risky + reusedSummary.risky,
+      undeliverable: freshSummary.undeliverable + reusedSummary.undeliverable,
+    };
     await supabase.from("verification_jobs").insert({
       ...jobBase,
       user_id: user.id,
@@ -159,11 +248,11 @@ async function startVerificationForScope(
       status: "completed",
       total_contacts: emails.length,
       processed_contacts: emails.length,
-      deliverable_count: summary.deliverable,
-      risky_count: summary.risky,
-      undeliverable_count: summary.undeliverable,
+      deliverable_count: freshSummary.deliverable,
+      risky_count: freshSummary.risky,
+      undeliverable_count: freshSummary.undeliverable,
     });
-    return { mode: "single", summary, submittedCount: emails.length, leftoverPending };
+    return { mode: "single", summary, submittedCount: emails.length, leftoverPending, reusedCount };
   }
 
   const { fileId } = await submitBulkFile(emails);
@@ -182,7 +271,13 @@ async function startVerificationForScope(
 
   if (jobError) throw jobError;
 
-  return { mode: "bulk", jobId: job.id as string, submittedCount: emails.length, leftoverPending };
+  return {
+    mode: "bulk",
+    jobId: job.id as string,
+    submittedCount: emails.length,
+    leftoverPending,
+    reusedCount,
+  };
 }
 
 export async function startVerification(
