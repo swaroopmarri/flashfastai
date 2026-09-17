@@ -17,8 +17,8 @@ interface Summary {
 type PanelState =
   | { phase: "idle" }
   | { phase: "starting" }
-  | { phase: "polling" }
-  | { phase: "done"; summary: Summary }
+  | { phase: "polling"; submittedCount: number; leftoverPending: number }
+  | { phase: "done"; summary: Summary; leftoverPending: number }
   | { phase: "error"; message: string };
 
 const POLL_INTERVAL_MS = 6000;
@@ -37,7 +37,7 @@ export function VerifyPanel({
   buttonLabel?: string;
 }) {
   const [state, setState] = useState<PanelState>(
-    activeJobId ? { phase: "polling" } : { phase: "idle" },
+    activeJobId ? { phase: "polling", submittedCount: pendingCount, leftoverPending: 0 } : { phase: "idle" },
   );
   const jobIdRef = useRef<string | null>(activeJobId);
   const router = useRouter();
@@ -55,11 +55,20 @@ export function VerifyPanel({
         if (cancelled) return;
 
         if (data.status === "completed") {
-          setState({ phase: "done", summary: data.summary });
+          setState((prev) => ({
+            phase: "done",
+            summary: data.summary,
+            leftoverPending: prev.phase === "polling" ? prev.leftoverPending : 0,
+          }));
           router.refresh();
         } else if (data.status === "failed") {
           setState({ phase: "error", message: data.errorMessage || "Verification failed." });
         } else {
+          setState((prev) =>
+            prev.phase === "polling"
+              ? { phase: "polling", submittedCount: data.totalContacts, leftoverPending: prev.leftoverPending }
+              : prev,
+          );
           setTimeout(poll, POLL_INTERVAL_MS);
         }
       } catch {
@@ -87,11 +96,15 @@ export function VerifyPanel({
       } else if (result.mode === "quota_exceeded") {
         setState({ phase: "error", message: result.message });
       } else if (result.mode === "single") {
-        setState({ phase: "done", summary: result.summary });
+        setState({ phase: "done", summary: result.summary, leftoverPending: result.leftoverPending });
         router.refresh();
       } else {
         jobIdRef.current = result.jobId;
-        setState({ phase: "polling" });
+        setState({
+          phase: "polling",
+          submittedCount: result.submittedCount,
+          leftoverPending: result.leftoverPending,
+        });
       }
     } catch (e) {
       setState({
@@ -100,6 +113,9 @@ export function VerifyPanel({
       });
     }
   }
+
+  const leftoverPending =
+    state.phase === "polling" || state.phase === "done" ? state.leftoverPending : 0;
 
   return (
     <div>
@@ -123,10 +139,21 @@ export function VerifyPanel({
       </p>
 
       {state.phase === "polling" && (
-        <p className="mt-3 flex items-center gap-2 text-sm text-indigo-700">
-          <span className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-700" />
-          Verifying your contacts — larger batches can take a few minutes. You can
-          leave this page and come back; verification continues in the background.
+        <div className="mt-3">
+          <p className="flex items-center gap-2 text-sm text-indigo-700">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-700" />
+            Verifying {state.submittedCount} contact{state.submittedCount === 1 ? "" : "s"} —
+            larger batches can take a few minutes. You can leave this page and come back;
+            verification continues in the background.
+          </p>
+        </div>
+      )}
+
+      {leftoverPending > 0 && (state.phase === "polling" || state.phase === "done") && (
+        <p className="mt-2 text-xs text-amber-700">
+          {leftoverPending} more contact{leftoverPending === 1 ? "" : "s"} still need verification
+          — this batch was limited by your remaining monthly quota. Run Verify Contacts again once
+          your quota increases or resets.
         </p>
       )}
 

@@ -29,8 +29,8 @@ export interface VerificationSummary {
 export type StartVerificationResult =
   | { mode: "none" }
   | { mode: "quota_exceeded"; message: string }
-  | { mode: "single"; summary: VerificationSummary }
-  | { mode: "bulk"; jobId: string };
+  | { mode: "single"; summary: VerificationSummary; submittedCount: number; leftoverPending: number }
+  | { mode: "bulk"; jobId: string; submittedCount: number; leftoverPending: number };
 
 const QUOTA_EXCEEDED_MESSAGE =
   "You've used your monthly validation limit. Contact your admin to increase it.";
@@ -124,9 +124,11 @@ async function startVerificationForScope(
   if (remaining === 0) {
     return { mode: "quota_exceeded", message: QUOTA_EXCEEDED_MESSAGE };
   }
+  const totalPending = emails.length;
   if (emails.length > remaining) {
     emails.length = remaining;
   }
+  const leftoverPending = totalPending - emails.length;
 
   const { data: quotaOk, error: quotaError } = await supabase.rpc("try_consume_quota", {
     p_kind: "validation",
@@ -161,7 +163,7 @@ async function startVerificationForScope(
       risky_count: summary.risky,
       undeliverable_count: summary.undeliverable,
     });
-    return { mode: "single", summary };
+    return { mode: "single", summary, submittedCount: emails.length, leftoverPending };
   }
 
   const { fileId } = await submitBulkFile(emails);
@@ -180,7 +182,7 @@ async function startVerificationForScope(
 
   if (jobError) throw jobError;
 
-  return { mode: "bulk", jobId: job.id as string };
+  return { mode: "bulk", jobId: job.id as string, submittedCount: emails.length, leftoverPending };
 }
 
 export async function startVerification(
