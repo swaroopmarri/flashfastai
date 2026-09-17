@@ -105,10 +105,30 @@ function chunk<T>(items: T[], size: number): T[][] {
   return chunks;
 }
 
+/** Runs `fn` over every item in `chunks`, at most `concurrency` in flight at
+ * once, instead of one at a time -- a large list can produce well over a
+ * hundred chunks, and doing them strictly in sequence adds a full network
+ * round trip per chunk before verification can even start. */
+async function runChunked<T>(
+  chunks: T[][],
+  concurrency: number,
+  fn: (chunk: T[]) => Promise<void>,
+): Promise<void> {
+  let next = 0;
+  async function worker() {
+    while (next < chunks.length) {
+      const chunk = chunks[next++];
+      await fn(chunk);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, chunks.length) }, worker));
+}
+
 // .in() is encoded into the request URL, so each chunk stays well under
 // any proxy's URL-length limit -- and since the result can never exceed
 // the input chunk's size, no further pagination is needed on the read side.
 const KNOWN_RESULT_CHECK_CHUNK_SIZE = 200;
+const KNOWN_RESULT_CHECK_CONCURRENCY = 8;
 
 /**
  * Finds pending emails that already have a real result (deliverable/risky/
@@ -124,26 +144,33 @@ async function findKnownResults(
   emails: string[],
 ): Promise<Map<string, { status: SimplifiedStatus; subStatus: string | null }>> {
   const known = new Map<string, { status: SimplifiedStatus; subStatus: string | null }>();
-  for (const batch of chunk(emails, KNOWN_RESULT_CHECK_CHUNK_SIZE)) {
-    const { data, error } = await supabase
-      .from("contacts")
-      .select("email, status, zerobounce_sub_status, verified_at")
-      .in("email", batch)
-      .neq("status", "pending_verification")
-      .order("verified_at", { ascending: false });
-    if (error) throw error;
-    for (const row of data ?? []) {
-      const email = (row.email as string).trim().toLowerCase();
-      // Rows are ordered newest-verified-first, so the first one seen per
-      // email is the most recent known result -- keep that one.
-      if (!known.has(email)) {
-        known.set(email, {
-          status: row.status as SimplifiedStatus,
-          subStatus: row.zerobounce_sub_status as string | null,
-        });
+  await runChunked(
+    chunk(emails, KNOWN_RESULT_CHECK_CHUNK_SIZE),
+    KNOWN_RESULT_CHECK_CONCURRENCY,
+    async (batch) => {
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("email, status, zerobounce_sub_status, verified_at")
+        .in("email", batch)
+        .neq("status", "pending_verification")
+        .order("verified_at", { ascending: false });
+      if (error) throw error;
+      for (const row of data ?? []) {
+        const email = (row.email as string).trim().toLowerCase();
+        // Rows are ordered newest-verified-first within a batch, but
+        // batches resolve concurrently and out of order -- an email can
+        // only appear in one 200-item batch to begin with (no duplicates
+        // across chunks), so racing writes into the map are never for the
+        // same key and this stays safe without extra locking.
+        if (!known.has(email)) {
+          known.set(email, {
+            status: row.status as SimplifiedStatus,
+            subStatus: row.zerobounce_sub_status as string | null,
+          });
+        }
       }
-    }
-  }
+    },
+  );
   return known;
 }
 
