@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { updateCampaignContent } from "../../actions";
+import { RichTextEditor } from "./RichTextEditor";
 
 export function ComposeForm({
   campaignId,
@@ -9,18 +10,21 @@ export function ComposeForm({
   initialBody,
   initialReplyTo,
   ownEmail,
+  userId,
 }: {
   campaignId: string;
   initialSubject: string;
   initialBody: string;
   initialReplyTo: string;
   ownEmail: string;
+  userId: string;
 }) {
   const [subject, setSubject] = useState(initialSubject);
   const [body, setBody] = useState(initialBody);
   const [replyTo, setReplyTo] = useState(initialReplyTo);
   const [saved, setSaved] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   function markDirty() {
@@ -39,7 +43,7 @@ export function ComposeForm({
     });
   }
 
-  const previewParagraphs = body.split(/\n{2,}/).filter((p) => p.trim());
+  const isBodyEmpty = !body.replace(/<[^>]+>/g, "").trim();
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -60,23 +64,18 @@ export function ComposeForm({
         </div>
 
         <div>
-          <label htmlFor="body" className="block text-sm font-medium text-gray-700">
-            Body
-          </label>
-          <textarea
-            id="body"
-            value={body}
-            onChange={(e) => {
-              setBody(e.target.value);
-              markDirty();
-            }}
-            rows={12}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Plain text — blank lines separate paragraphs. An unsubscribe link
-            is added automatically.
-          </p>
+          <label className="block text-sm font-medium text-gray-700">Body</label>
+          <div className="mt-1">
+            <RichTextEditor
+              content={body}
+              userId={userId}
+              onChange={(html) => {
+                setBody(html);
+                markDirty();
+              }}
+              onUploadingChange={setUploadingImage}
+            />
+          </div>
         </div>
 
         <div>
@@ -106,10 +105,16 @@ export function ComposeForm({
 
         <button
           onClick={handleSave}
-          disabled={isPending || saved}
+          disabled={isPending || saved || uploadingImage}
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isPending ? "Saving..." : saved ? "Saved" : "Save draft"}
+          {uploadingImage
+            ? "Uploading image..."
+            : isPending
+              ? "Saving..."
+              : saved
+                ? "Saved"
+                : "Save draft"}
         </button>
       </div>
 
@@ -119,12 +124,11 @@ export function ComposeForm({
           <p className="mb-1 text-xs text-gray-400">Subject</p>
           <p className="mb-4 font-medium text-gray-900">{subject || "(no subject)"}</p>
           <p className="mb-1 text-xs text-gray-400">Body</p>
-          {previewParagraphs.length > 0 ? (
-            previewParagraphs.map((p, i) => (
-              <p key={i} className="mb-3 whitespace-pre-wrap text-sm text-gray-800">
-                {p}
-              </p>
-            ))
+          {!isBodyEmpty ? (
+            <div
+              className="prose prose-sm max-w-none text-sm text-gray-800"
+              dangerouslySetInnerHTML={{ __html: body }}
+            />
           ) : (
             <p className="text-sm text-gray-400">(no body)</p>
           )}

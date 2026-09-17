@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { fetchAllRows } from "@/lib/supabasePagination";
+import { isHtmlBodyEmpty } from "@/lib/campaignSend";
 import { ComposeForm } from "./ComposeForm";
 import { SendPanel } from "./SendPanel";
 
@@ -72,7 +73,7 @@ export default async function ComposePage({
   }
 
   const isDraft = campaign.status === "draft";
-  const canSend = Boolean(campaign.subject?.trim() && campaign.body?.trim());
+  const canSend = Boolean(campaign.subject?.trim() && !isHtmlBodyEmpty(campaign.body ?? ""));
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -94,13 +95,17 @@ export default async function ComposePage({
             initialBody={campaign.body ?? ""}
             initialReplyTo={campaign.reply_to ?? ""}
             ownEmail={user.email ?? ""}
+            userId={user.id}
           />
         ) : (
           <div>
             <p className="mb-1 text-xs text-gray-400">Subject</p>
             <p className="mb-4 font-medium text-gray-900">{campaign.subject}</p>
             <p className="mb-1 text-xs text-gray-400">Body</p>
-            <p className="whitespace-pre-wrap text-sm text-gray-800">{campaign.body}</p>
+            <div
+              className="prose prose-sm max-w-none text-sm text-gray-800"
+              dangerouslySetInnerHTML={{ __html: campaign.body ?? "" }}
+            />
           </div>
         )}
       </div>

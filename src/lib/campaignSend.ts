@@ -11,16 +11,36 @@ export type StartSendResult =
   | { mode: "blocked"; message: string }
   | { mode: "started"; jobId: string };
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// Compose stores the body as sanitized HTML (see sanitizeCampaignHtml) --
+// sending wraps it as-is and derives a plain-text fallback by stripping
+// tags, rather than escaping/paragraph-wrapping plain text the way this
+// used to work before the rich-text editor.
+function renderHtmlBody(htmlBody: string, unsubscribeUrl: string): string {
+  return `<div>${htmlBody}<hr><p style="font-size:12px;color:#6b7280;">Don't want these emails? <a href="${unsubscribeUrl}">Unsubscribe</a>.</p></div>`;
 }
 
-function renderHtmlBody(plainText: string, unsubscribeUrl: string): string {
-  const paragraphs = plainText
-    .split(/\n{2,}/)
-    .map((p) => `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`)
-    .join("\n");
-  return `<div>${paragraphs}<hr><p style="font-size:12px;color:#6b7280;">Don't want these emails? <a href="${unsubscribeUrl}">Unsubscribe</a>.</p></div>`;
+// A body can be entirely images/tables with no text -- stripped-tag text
+// would read as empty even though the email would render real content, so
+// emptiness also checks for content-bearing tags before blocking a send.
+export function isHtmlBodyEmpty(html: string): boolean {
+  if (/<(img|table)\b/i.test(html)) return false;
+  return !htmlToPlainText(html);
+}
+
+function htmlToPlainText(html: string): string {
+  return html
+    .replace(/<(p|div|tr|br|h[1-6])[^>]*>/gi, "\n")
+    .replace(/<\/(p|div|tr|h[1-6])>/gi, "\n")
+    .replace(/<(td|th)[^>]*>/gi, "\t")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export async function startCampaignSend(
@@ -37,7 +57,7 @@ export async function startCampaignSend(
   if (campaign.status !== "draft") {
     return { mode: "blocked", message: `This campaign is already ${campaign.status}.` };
   }
-  if (!campaign.subject?.trim() || !campaign.body?.trim()) {
+  if (!campaign.subject?.trim() || isHtmlBodyEmpty(campaign.body ?? "")) {
     return { mode: "blocked", message: "Add a subject and body before sending." };
   }
   if (!campaign.contact_list_id && !campaign.company_domain) {
@@ -239,7 +259,7 @@ export async function processSendJobBatch(
 
   for (const recipient of batch) {
     const unsubscribeUrl = `${origin}/unsubscribe/${recipient.unsubscribe_token}`;
-    const textBody = `${campaign.body}\n\n---\nUnsubscribe: ${unsubscribeUrl}`;
+    const textBody = `${htmlToPlainText(campaign.body)}\n\n---\nUnsubscribe: ${unsubscribeUrl}`;
     const htmlBody = renderHtmlBody(campaign.body, unsubscribeUrl);
 
     try {

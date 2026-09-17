@@ -6,6 +6,7 @@ import { createClient } from "@/utils/supabase/server";
 import { getCurrentMembership } from "@/lib/organizations";
 import { startCampaignSend, type StartSendResult } from "@/lib/campaignSend";
 import { companyDisplayName } from "@/lib/companyName";
+import { sanitizeCampaignHtml } from "@/lib/sanitizeCampaignHtml";
 
 export async function createCampaign(name: string, contactListId: string) {
   const supabase = createClient();
@@ -104,7 +105,7 @@ export async function updateCampaignContent(
     .from("campaigns")
     .update({
       subject: subject.trim(),
-      body: body.trim(),
+      body: sanitizeCampaignHtml(body.trim()),
       reply_to: replyTo.trim() || null,
     })
     .eq("id", campaignId);
