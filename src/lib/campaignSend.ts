@@ -106,7 +106,7 @@ export async function startCampaignSend(
       mode: "blocked",
       message:
         remaining > 0
-          ? `This campaign has ${recipients.length} eligible recipients, but you only have ${remaining} sends left this month. Reduce the audience, wait for your quota to reset, or contact your admin to increase it.`
+          ? `You can't send beyond your remaining limit. This campaign has ${recipients.length} eligible recipients, but you only have ${remaining} sends left this month — reduce your audience to ${remaining} or fewer and try again, or contact your admin to increase your quota.`
           : "You've used your monthly send limit. Contact your admin to increase it.",
     };
   }
