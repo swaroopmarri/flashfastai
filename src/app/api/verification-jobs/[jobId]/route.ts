@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { pollVerificationJob } from "@/lib/verification";
 
+// The first poll after MillionVerifier reports a bulk file complete
+// downloads and stages the full report (see stageResults in
+// src/lib/verification.ts) -- for a large list that's more than the
+// platform's default function timeout, though every poll after that only
+// applies one small batch and stays fast.
+export const maxDuration = 60;
+
 export async function GET(
   _request: Request,
   { params }: { params: { jobId: string } },

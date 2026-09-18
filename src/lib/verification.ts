@@ -5,6 +5,7 @@ import {
   getBulkFileStatus,
   getBulkFileResult,
   type SimplifiedStatus,
+  type SingleValidateResult,
 } from "@/lib/millionverifier";
 import { getCurrentMembership } from "@/lib/organizations";
 import { fetchAllRows } from "@/lib/supabasePagination";
@@ -50,6 +51,13 @@ const NOT_ACTIVE_MESSAGE =
  * so if the same email exists in multiple lists, verifying it once via
  * "My Network" keeps every copy in sync instead of only one.
  */
+// Supabase has no single-call "bulk update, different value per row" via
+// the JS client, so this still issues one UPDATE per email -- but with a
+// bounded worker pool instead of one at a time, so a few hundred rows
+// (one poll's batch, see applyNextBatch) finish in a couple of seconds
+// instead of one request per row in strict sequence.
+const APPLY_CONCURRENCY = 10;
+
 async function applyResults(
   supabase: SupabaseClient,
   scope: VerificationScope,
@@ -57,23 +65,28 @@ async function applyResults(
 ): Promise<VerificationSummary> {
   const summary: VerificationSummary = { deliverable: 0, risky: 0, undeliverable: 0 };
 
-  for (const result of results) {
-    summary[result.status]++;
-    let query = supabase
-      .from("contacts")
-      .update({
-        status: result.status,
-        zerobounce_sub_status: result.subStatus,
-        verified_at: new Date().toISOString(),
-      })
-      .eq("email", result.email.trim().toLowerCase());
+  let next = 0;
+  async function worker() {
+    while (next < results.length) {
+      const result = results[next++];
+      summary[result.status]++;
+      let query = supabase
+        .from("contacts")
+        .update({
+          status: result.status,
+          zerobounce_sub_status: result.subStatus,
+          verified_at: new Date().toISOString(),
+        })
+        .eq("email", result.email.trim().toLowerCase());
 
-    if (scope.type === "list") {
-      query = query.eq("contact_list_id", scope.contactListId);
+      if (scope.type === "list") {
+        query = query.eq("contact_list_id", scope.contactListId);
+      }
+
+      await query;
     }
-
-    await query;
   }
+  await Promise.all(Array.from({ length: Math.min(APPLY_CONCURRENCY, results.length) }, worker));
 
   return summary;
 }
@@ -328,6 +341,126 @@ export interface JobPollResult {
   errorMessage: string | null;
 }
 
+interface VerificationJobRow {
+  id: string;
+  status: "queued" | "processing" | "completed" | "failed";
+  mode: "single" | "bulk";
+  zerobounce_file_id: string | null;
+  contact_list_id: string | null;
+  company_domain: string | null;
+  results_downloaded: boolean;
+  total_contacts: number;
+  processed_contacts: number;
+  deliverable_count: number;
+  risky_count: number;
+  undeliverable_count: number;
+  error_message: string | null;
+}
+
+function toJobPollResult(job: VerificationJobRow): JobPollResult {
+  return {
+    status: job.status,
+    totalContacts: job.total_contacts,
+    summary: {
+      deliverable: job.deliverable_count,
+      risky: job.risky_count,
+      undeliverable: job.undeliverable_count,
+    },
+    errorMessage: job.error_message,
+  };
+}
+
+// Applying to `contacts` can't be done for the whole report at once (see
+// APPLY_CONCURRENCY's comment) -- so once the report is downloaded, it's
+// staged row-by-row into verification_job_results and applied this many at
+// a time per poll, the same "bounded batch per request" shape already used
+// for campaign sending (processSendJobBatch).
+const APPLY_BATCH_SIZE = 300;
+
+const STAGE_CHUNK_SIZE = 1000;
+const STAGE_CONCURRENCY = 4;
+
+async function stageResults(
+  supabase: SupabaseClient,
+  jobId: string,
+  results: SingleValidateResult[],
+): Promise<void> {
+  const rows = results.map((r) => ({
+    job_id: jobId,
+    email: r.email.trim().toLowerCase(),
+    status: r.status,
+    sub_status: r.subStatus,
+  }));
+  await runChunked(chunk(rows, STAGE_CHUNK_SIZE), STAGE_CONCURRENCY, async (batch) => {
+    const { error } = await supabase.from("verification_job_results").insert(batch);
+    if (error) throw error;
+  });
+}
+
+/** Applies up to APPLY_BATCH_SIZE not-yet-applied staged rows to `contacts`,
+ * advancing the job's counters -- once a poll finds nothing left to apply,
+ * the job is done. */
+async function applyNextBatch(
+  supabase: SupabaseClient,
+  job: VerificationJobRow,
+): Promise<JobPollResult> {
+  const { data: batch, error: batchError } = await supabase
+    .from("verification_job_results")
+    .select("id, email, status, sub_status")
+    .eq("job_id", job.id)
+    .eq("applied", false)
+    .limit(APPLY_BATCH_SIZE);
+  if (batchError) throw batchError;
+
+  if (!batch || batch.length === 0) {
+    const { data: finished, error: finalizeError } = await supabase
+      .from("verification_jobs")
+      .update({ status: "completed" })
+      .eq("id", job.id)
+      .select("*")
+      .single();
+    if (finalizeError) throw finalizeError;
+    return toJobPollResult(finished);
+  }
+
+  const scope: VerificationScope = job.contact_list_id
+    ? { type: "list", contactListId: job.contact_list_id }
+    : { type: "company", domain: job.company_domain as string };
+
+  const summary = await applyResults(
+    supabase,
+    scope,
+    batch.map((r) => ({
+      email: r.email as string,
+      status: r.status as SimplifiedStatus,
+      subStatus: r.sub_status as string | null,
+    })),
+  );
+
+  await supabase
+    .from("verification_job_results")
+    .update({ applied: true })
+    .in(
+      "id",
+      batch.map((r) => r.id),
+    );
+
+  const { data: updated, error: updateError } = await supabase
+    .from("verification_jobs")
+    .update({
+      processed_contacts: job.processed_contacts + batch.length,
+      deliverable_count: job.deliverable_count + summary.deliverable,
+      risky_count: job.risky_count + summary.risky,
+      undeliverable_count: job.undeliverable_count + summary.undeliverable,
+    })
+    .eq("id", job.id)
+    .select("*")
+    .single();
+  if (updateError) throw updateError;
+
+  return toJobPollResult(updated);
+}
+
 export async function pollVerificationJob(
   supabase: SupabaseClient,
   jobId: string,
@@ -340,23 +473,19 @@ export async function pollVerificationJob(
 
   if (error) throw error;
 
-  const toResult = (): JobPollResult => ({
-    status: job.status,
-    totalContacts: job.total_contacts,
-    summary: {
-      deliverable: job.deliverable_count,
-      risky: job.risky_count,
-      undeliverable: job.undeliverable_count,
-    },
-    errorMessage: job.error_message,
-  });
-
   if (job.status === "completed" || job.status === "failed") {
-    return toResult();
+    return toJobPollResult(job);
   }
 
   if (job.mode !== "bulk" || !job.zerobounce_file_id) {
-    return toResult();
+    return toJobPollResult(job);
+  }
+
+  // The report has already been downloaded and staged (possibly by an
+  // earlier poll) -- just keep applying it in batches without re-checking
+  // MillionVerifier or re-downloading anything.
+  if (job.results_downloaded) {
+    return applyNextBatch(supabase, job);
   }
 
   const { status: zbStatus, errorReason } = await getBulkFileStatus(
@@ -364,42 +493,48 @@ export async function pollVerificationJob(
   );
 
   if (zbStatus === "Processing" || zbStatus === "Unknown") {
-    return toResult();
+    return toJobPollResult(job);
   }
 
   if (zbStatus === "Failed") {
-    await supabase
+    const { data: failed, error: failError } = await supabase
       .from("verification_jobs")
       .update({ status: "failed", error_message: errorReason || "Verification failed" })
-      .eq("id", jobId);
-    job.status = "failed";
-    job.error_message = errorReason || "Verification failed";
-    return toResult();
+      .eq("id", jobId)
+      .select("*")
+      .single();
+    if (failError) throw failError;
+    return toJobPollResult(failed);
   }
 
-  // zbStatus === "Complete"
-  const scope: VerificationScope = job.contact_list_id
-    ? { type: "list", contactListId: job.contact_list_id }
-    : { type: "company", domain: job.company_domain };
+  // zbStatus === "Complete" -- download the report exactly once and stage
+  // it for batched application. If MillionVerifier's actual column names
+  // don't match what getBulkFileResult() expects, this comes back empty
+  // instead of silently completing with a false all-zero result.
   const results = await getBulkFileResult(job.zerobounce_file_id);
-  const summary = await applyResults(supabase, scope, results);
+  if (results.length === 0 && job.total_contacts > 0) {
+    const { data: failed, error: failError } = await supabase
+      .from("verification_jobs")
+      .update({
+        status: "failed",
+        error_message:
+          "MillionVerifier's report came back with no usable rows -- the report format may have changed.",
+      })
+      .eq("id", jobId)
+      .select("*")
+      .single();
+    if (failError) throw failError;
+    return toJobPollResult(failed);
+  }
 
-  await supabase
+  await stageResults(supabase, jobId, results);
+  const { data: staged, error: stageError } = await supabase
     .from("verification_jobs")
-    .update({
-      status: "completed",
-      processed_contacts: results.length,
-      deliverable_count: summary.deliverable,
-      risky_count: summary.risky,
-      undeliverable_count: summary.undeliverable,
-    })
-    .eq("id", jobId);
+    .update({ results_downloaded: true })
+    .eq("id", jobId)
+    .select("*")
+    .single();
+  if (stageError) throw stageError;
 
-  job.status = "completed";
-  job.processed_contacts = results.length;
-  job.deliverable_count = summary.deliverable;
-  job.risky_count = summary.risky;
-  job.undeliverable_count = summary.undeliverable;
-
-  return toResult();
+  return applyNextBatch(supabase, staged);
 }
