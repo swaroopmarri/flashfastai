@@ -3,6 +3,12 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { AudienceToggle } from "./AudienceToggle";
 import { companyDisplayName } from "@/lib/companyName";
+import { fetchAllRows } from "@/lib/supabasePagination";
+
+// A large list needs several paginated reads to count in full (see
+// fetchAllRows) -- give this route's serverless function more than the
+// platform default (often ~10-15s) to finish them all.
+export const maxDuration = 60;
 
 export default async function AudiencePage({
   params,
@@ -26,20 +32,23 @@ export default async function AudiencePage({
   const counts = { deliverable: 0, risky: 0, undeliverable: 0, pending_verification: 0 };
 
   if (campaign.contact_list_id) {
-    const { data: contacts, error } = await supabase
-      .from("contacts")
-      .select("status")
-      .eq("contact_list_id", campaign.contact_list_id);
-    if (error) throw error;
-    for (const c of contacts ?? []) {
+    const contacts = await fetchAllRows<{ status: string }>((from, to) =>
+      supabase
+        .from("contacts")
+        .select("status")
+        .eq("contact_list_id", campaign.contact_list_id)
+        .range(from, to),
+    );
+    for (const c of contacts) {
       if (c.status in counts) counts[c.status as keyof typeof counts]++;
     }
   } else {
-    const { data: contacts, error } = await supabase.rpc("get_network_domain_contacts", {
-      p_domain: campaign.company_domain,
-    });
-    if (error) throw error;
-    for (const c of contacts ?? []) {
+    const contacts = await fetchAllRows<{ status: string }>((from, to) =>
+      supabase
+        .rpc("get_network_domain_contacts", { p_domain: campaign.company_domain })
+        .range(from, to),
+    );
+    for (const c of contacts) {
       if (c.status in counts) counts[c.status as keyof typeof counts]++;
     }
   }
