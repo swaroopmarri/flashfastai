@@ -26,6 +26,7 @@ export function SendPanel({
   recipientCount,
   campaignStatus,
   initialJobId,
+  initialProcessedRecipients,
   initialSummary,
 }: {
   campaignId: string;
@@ -33,6 +34,7 @@ export function SendPanel({
   recipientCount: number;
   campaignStatus: "draft" | "sending" | "sent" | "failed";
   initialJobId: string | null;
+  initialProcessedRecipients: number;
   initialSummary: Summary | null;
 }) {
   const [state, setState] = useState<PanelState>(() => {
@@ -43,7 +45,12 @@ export function SendPanel({
       return {
         phase: "polling",
         totalRecipients: initialSummary?.totalRecipients ?? 0,
-        processedRecipients: 0,
+        // A page reload used to always show 0 here regardless of real
+        // progress, since nothing was passed in until the first poll
+        // response landed -- if that poll never fires (e.g. the tab is
+        // backgrounded and throttled), the count looked permanently stuck
+        // even while the job kept advancing normally on the server.
+        processedRecipients: initialProcessedRecipients,
       };
     }
     return { phase: "idle" };

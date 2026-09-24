@@ -56,7 +56,7 @@ export default async function ComposePage({
 
   const { data: latestJob } = await supabase
     .from("send_jobs")
-    .select("id, status, total_recipients, sent_count, failed_count")
+    .select("id, status, total_recipients, processed_recipients, sent_count, failed_count")
     .eq("campaign_id", campaign.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -116,6 +116,7 @@ export default async function ComposePage({
         recipientCount={recipientCount}
         campaignStatus={campaign.status}
         initialJobId={latestJob?.id ?? null}
+        initialProcessedRecipients={latestJob?.processed_recipients ?? 0}
         initialSummary={
           latestJob
             ? {
