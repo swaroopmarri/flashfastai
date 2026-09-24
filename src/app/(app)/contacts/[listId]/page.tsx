@@ -1,15 +1,12 @@
-import { Fragment } from "react";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { UploadForm } from "../UploadForm";
 import { VerifyPanel } from "../../_components/VerifyPanel";
-import { companyDisplayName } from "@/lib/companyName";
-import { fetchAllRows } from "@/lib/supabasePagination";
+import { Pagination } from "../../_components/Pagination";
+import { escapeIlike } from "@/lib/searchFilter";
 
-// A large merged file's mergeContacts call chunks many DB round trips (see
-// ../actions.ts) -- give this route's serverless function more than the
-// platform default (often ~10-15s) to finish them all.
-export const maxDuration = 60;
+const PAGE_SIZE = 100;
 
 const STATUS_STYLES: Record<string, string> = {
   pending_verification: "bg-gray-100 text-gray-700",
@@ -19,54 +16,12 @@ const STATUS_STYLES: Record<string, string> = {
   unsubscribed: "bg-gray-200 text-gray-500",
 };
 
-interface ContactRow {
-  id: string;
-  email: string;
-  name: string | null;
-  company: string | null;
-  status: string;
-}
-
-function emailDomain(email: string): string {
-  return email.split("@")[1]?.toLowerCase() ?? "";
-}
-
-/** Groups by company when known, otherwise by email domain, so contacts
- * from the same company or the same mail domain cluster together. */
-function groupKey(c: ContactRow): string {
-  const company = c.company?.trim().toLowerCase();
-  return company ? `company:${company}` : `domain:${emailDomain(c.email)}`;
-}
-
-function groupLabel(c: ContactRow): string {
-  const company = c.company?.trim();
-  if (company) return `Company: ${company}`;
-  const domain = emailDomain(c.email);
-  return `${companyDisplayName(domain)} (${domain})`;
-}
-
-function sortAndGroupContacts(contacts: ContactRow[]): {
-  sorted: ContactRow[];
-  counts: Map<string, number>;
-} {
-  const sorted = [...contacts].sort((a, b) => {
-    const keyDiff = groupKey(a).localeCompare(groupKey(b));
-    return keyDiff !== 0 ? keyDiff : a.email.localeCompare(b.email);
-  });
-
-  const counts = new Map<string, number>();
-  for (const c of sorted) {
-    const key = groupKey(c);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-
-  return { sorted, counts };
-}
-
 export default async function ContactListPage({
   params,
+  searchParams,
 }: {
   params: { listId: string };
+  searchParams: { page?: string; q?: string };
 }) {
   const supabase = createClient();
   const {
@@ -82,14 +37,38 @@ export default async function ContactListPage({
 
   if (!list) notFound();
 
-  const contacts = await fetchAllRows<ContactRow>((from, to) =>
-    supabase
-      .from("contacts")
-      .select("id, email, name, company, status")
-      .eq("contact_list_id", params.listId)
-      .order("created_at", { ascending: false })
-      .range(from, to),
-  );
+  const q = (searchParams.q ?? "").trim();
+  const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  let query = supabase
+    .from("contacts")
+    .select("id, email, name, company, status", { count: "exact" })
+    .eq("contact_list_id", params.listId);
+
+  if (q) {
+    const term = `%${escapeIlike(q)}%`;
+    query = query.or(`email.ilike.${term},name.ilike.${term},company.ilike.${term}`);
+  }
+
+  const {
+    data: contacts,
+    count,
+    error,
+  } = await query
+    .order("company", { ascending: true, nullsFirst: false })
+    .order("email", { ascending: true })
+    .range(from, to);
+  if (error) throw error;
+
+  // The Verify panel always needs the true pending count for the WHOLE
+  // list, not just whatever's matched by the current search/page.
+  const { count: pendingCount } = await supabase
+    .from("contacts")
+    .select("*", { count: "exact", head: true })
+    .eq("contact_list_id", params.listId)
+    .eq("status", "pending_verification");
 
   const { data: activeJob } = await supabase
     .from("verification_jobs")
@@ -99,9 +78,15 @@ export default async function ContactListPage({
     .order("created_at", { ascending: false })
     .maybeSingle();
 
-  const pendingCount = contacts.filter((c) => c.status === "pending_verification").length;
+  const total = count ?? 0;
 
-  const { sorted: sortedContacts, counts: groupCounts } = sortAndGroupContacts(contacts);
+  function buildHref(nextPage: number) {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (nextPage > 1) sp.set("page", String(nextPage));
+    const qs = sp.toString();
+    return `/contacts/${params.listId}${qs ? `?${qs}` : ""}`;
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -110,7 +95,7 @@ export default async function ContactListPage({
       <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <VerifyPanel
           target={{ type: "list", listId: list.id }}
-          pendingCount={pendingCount}
+          pendingCount={pendingCount ?? 0}
           activeJobId={activeJob?.id ?? null}
         />
       </div>
@@ -120,9 +105,42 @@ export default async function ContactListPage({
         <UploadForm mode="merge" listId={list.id} />
       </div>
 
-      <h2 className="mb-3 text-lg font-medium text-gray-900">
-        Contacts ({contacts.length})
-      </h2>
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <h2 className="text-lg font-medium text-gray-900">
+          {q ? (
+            <>
+              Contacts matching &quot;{q}&quot; ({total})
+            </>
+          ) : (
+            <>Contacts ({total})</>
+          )}
+        </h2>
+      </div>
+
+      <form action={`/contacts/${list.id}`} className="mb-4 flex gap-2">
+        <input
+          type="text"
+          name="q"
+          defaultValue={q}
+          placeholder="Search by email, name, or company"
+          className="block w-full max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        />
+        <button
+          type="submit"
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+        >
+          Search
+        </button>
+        {q && (
+          <Link
+            href={`/contacts/${list.id}`}
+            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Clear
+          </Link>
+        )}
+      </form>
+
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead>
@@ -134,42 +152,30 @@ export default async function ContactListPage({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {(() => {
-              let lastKey: string | null = null;
-              return sortedContacts.map((c) => {
-                const key = groupKey(c);
-                const isNewGroup = key !== lastKey;
-                lastKey = key;
-                return (
-                  <Fragment key={c.id}>
-                    {isNewGroup && (
-                      <tr className="bg-gray-50">
-                        <td
-                          colSpan={4}
-                          className="px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500"
-                        >
-                          {groupLabel(c)} ({groupCounts.get(key)})
-                        </td>
-                      </tr>
-                    )}
-                    <tr>
-                      <td className="px-4 py-2 text-gray-900">{c.email}</td>
-                      <td className="px-4 py-2 text-gray-600">{c.name || "—"}</td>
-                      <td className="px-4 py-2 text-gray-600">{c.company || "—"}</td>
-                      <td className="px-4 py-2">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[c.status] ?? "bg-gray-100 text-gray-700"}`}
-                        >
-                          {c.status.replace("_", " ")}
-                        </span>
-                      </td>
-                    </tr>
-                  </Fragment>
-                );
-              });
-            })()}
+            {(contacts ?? []).map((c) => (
+              <tr key={c.id}>
+                <td className="px-4 py-2 text-gray-900">{c.email}</td>
+                <td className="px-4 py-2 text-gray-600">{c.name || "—"}</td>
+                <td className="px-4 py-2 text-gray-600">{c.company || "—"}</td>
+                <td className="px-4 py-2">
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[c.status] ?? "bg-gray-100 text-gray-700"}`}
+                  >
+                    {c.status.replace("_", " ")}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {(contacts ?? []).length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-400">
+                  No contacts match your search.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
+        <Pagination page={page} pageSize={PAGE_SIZE} total={total} buildHref={buildHref} />
       </div>
     </div>
   );

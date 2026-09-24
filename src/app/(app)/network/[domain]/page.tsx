@@ -2,15 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import { VerifyPanel } from "../../_components/VerifyPanel";
+import { Pagination } from "../../_components/Pagination";
 import { createCompanyCampaign } from "../../campaigns/actions";
 import { companyDisplayName } from "@/lib/companyName";
-import { fetchAllRows } from "@/lib/supabasePagination";
+import { escapeIlike } from "@/lib/searchFilter";
 
-// A company with many contacts needs several paginated reads to fetch in
-// full (see fetchAllRows), and "Verify all unverified" here can trigger the
-// same for pending emails -- give this route's serverless function more
-// than the platform default (often ~10-15s) to finish them all.
-export const maxDuration = 60;
+const PAGE_SIZE = 100;
 
 const STATUS_STYLES: Record<string, string> = {
   pending_verification: "bg-gray-100 text-gray-700",
@@ -28,10 +25,18 @@ interface DomainContact {
   list_names: string[];
 }
 
+interface DomainCounts {
+  domain: string;
+  total: number;
+  pending: number;
+}
+
 export default async function NetworkDomainPage({
   params,
+  searchParams,
 }: {
   params: { domain: string };
+  searchParams: { page?: string; q?: string };
 }) {
   const domain = decodeURIComponent(params.domain);
   const supabase = createClient();
@@ -40,11 +45,40 @@ export default async function NetworkDomainPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const contacts = await fetchAllRows<DomainContact>((from, to) =>
-    supabase.rpc("get_network_domain_contacts", { p_domain: domain }).range(from, to),
+  const q = (searchParams.q ?? "").trim();
+  const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  // Aggregate counts for the WHOLE domain (unaffected by search/paging) --
+  // reuses the same aggregate the My Network overview page already computes,
+  // instead of pulling every contact just to count them.
+  const { data: domainCounts } = await supabase
+    .rpc("get_network_domain_counts")
+    .eq("domain", domain)
+    .maybeSingle<DomainCounts>();
+  const total_count = domainCounts?.total ?? 0;
+  const pendingCount = domainCounts?.pending ?? 0;
+  const verifiedCount = total_count - pendingCount;
+
+  let query = supabase.rpc(
+    "get_network_domain_contacts",
+    { p_domain: domain },
+    { count: "exact" },
   );
-  const pendingCount = contacts.filter((c) => c.status === "pending_verification").length;
-  const verifiedCount = contacts.length - pendingCount;
+  if (q) {
+    const term = `%${escapeIlike(q)}%`;
+    query = query.or(`email.ilike.${term},name.ilike.${term},company.ilike.${term}`);
+  }
+
+  const {
+    data: contacts,
+    count,
+    error,
+  } = await query.order("email", { ascending: true }).range(from, to);
+  if (error) throw error;
+
+  const matchedCount = count ?? 0;
 
   const { data: activeJob } = await supabase
     .from("verification_jobs")
@@ -56,6 +90,14 @@ export default async function NetworkDomainPage({
     .maybeSingle();
 
   const createCampaignForDomain = createCompanyCampaign.bind(null, domain);
+
+  function buildHref(nextPage: number) {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (nextPage > 1) sp.set("page", String(nextPage));
+    const qs = sp.toString();
+    return `/network/${params.domain}${qs ? `?${qs}` : ""}`;
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -99,10 +141,18 @@ export default async function NetworkDomainPage({
 
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-lg font-medium text-gray-900">
-          Contacts ({contacts.length})
-          <span className="ml-2 text-sm font-normal text-gray-500">
-            {verifiedCount} of {contacts.length} verified
-          </span>
+          {q ? (
+            <>
+              Contacts matching &quot;{q}&quot; ({matchedCount})
+            </>
+          ) : (
+            <>Contacts ({total_count})</>
+          )}
+          {!q && (
+            <span className="ml-2 text-sm font-normal text-gray-500">
+              {verifiedCount} of {total_count} verified
+            </span>
+          )}
         </h2>
         <a
           href={`/api/network/${domain}/export`}
@@ -111,6 +161,31 @@ export default async function NetworkDomainPage({
           Download CSV
         </a>
       </div>
+
+      <form action={`/network/${params.domain}`} className="mb-4 flex gap-2">
+        <input
+          type="text"
+          name="q"
+          defaultValue={q}
+          placeholder="Search by email, name, or company"
+          className="block w-full max-w-sm rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        />
+        <button
+          type="submit"
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+        >
+          Search
+        </button>
+        {q && (
+          <Link
+            href={`/network/${params.domain}`}
+            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Clear
+          </Link>
+        )}
+      </form>
+
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead>
@@ -122,7 +197,7 @@ export default async function NetworkDomainPage({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {contacts.map((c) => (
+            {((contacts ?? []) as DomainContact[]).map((c) => (
               <tr key={c.email}>
                 <td className="px-4 py-2 text-gray-900">{c.email}</td>
                 <td className="px-4 py-2 text-gray-600">{c.name || "—"}</td>
@@ -147,8 +222,16 @@ export default async function NetworkDomainPage({
                 </td>
               </tr>
             ))}
+            {(contacts ?? []).length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-400">
+                  No contacts match your search.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
+        <Pagination page={page} pageSize={PAGE_SIZE} total={matchedCount} buildHref={buildHref} />
       </div>
     </div>
   );
